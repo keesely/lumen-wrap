@@ -1,0 +1,46 @@
+<?php
+
+namespace DummyNamespace;
+
+use App\Http\Requests\Request;
+use App\Http\Controllers\Controller;
+use Package\LumenExtra\Controllers\MixRouter;
+
+class DummyClass extends Controller {
+
+  use MixRouter;
+
+  static $controller_routes = [
+    'POST:/'        => 'create',
+    'GET:/'         => 'index',
+    'GET:/{id}'     => 'show',
+    'PUT:/{id}'     => 'update',
+    'DELETE:/{id}'  => 'destory'
+  ];
+
+  protected $list_required = '*';
+
+  public function index() {
+    //
+  }
+
+  public function show($id) {
+    //
+  }
+
+  public function create(Request $request) {
+    //
+  }
+
+  public function edit($id) {
+    //
+  }
+
+  public function update($id, Request $request) {
+    //
+  }
+
+  public function destroy($id) {
+    //
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "keesely/lumen-wrap",
+  "description": "laravel/lumen-framework extension packages",
+  "keyworkds": ["framework", "extension", "laravel", "lumen"],
+  "license": "MIT",
+  "homepage": "https://github.com/keesely/lumen-wrap",
+  "support": {
+    "issues": "https://github.com/keesely/lumen-wrap/issues",
+    "source": "https://github.com/keesely/lumen-wrap"
+  },
+  "require": {
+    "php": "^8.2",
+    "laravel/lumen-framework": "^11.0"
+  },
+  "require-dev": {
+    "doctrine/dbal": "^4.3",
+    "phpunit/phpunit": "^10.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Lx\\": "src/"
+    },
+    "files": [
+      "src/helpers.php"
+    ]
+  },
+  "autoload-dev": {
+    "classmap": [
+      "tests/"
+    ]
+  },
+  "authors": [
+    {
+      "name": "kee",
+      "email": "chinboy2012@gmail.com"
+    }
+  ],
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
