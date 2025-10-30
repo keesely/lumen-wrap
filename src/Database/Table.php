@@ -19,6 +19,7 @@ class Table {
   protected $foreignKeys = [];
 
   const FOREIGN_HANDLERS = [
+    'update'           , 'delete'           ,
     'onUpdate'         , 'onDelete'         ,
     'cascadeOnUpdate'  , 'cascadeOnDelete'  ,
     'restrictOnUpdate' , 'restrictOnDelete' ,
@@ -282,6 +283,12 @@ class Table {
       case 'foreign':
         if (is_array($val)) $this->foreignKeys[$name] = $val;
         break;
+      case 'onDelete': case 'onUpdate':
+      case 'cascadeOnUpdate' : case 'cascadeOnDelete' : 
+      case 'restrictOnUpdate': case 'restrictOnDelete': 
+      case 'nullOnUpdate'    : case 'nullOnDelete'    : 
+      case 'noActionOnUpdate': case 'noActionOnDelete': 
+        $this->foreignKeys[$name][2][$nk] = $val;
       default:
         $define->$nk($val);
         break;
@@ -322,31 +329,53 @@ class Table {
       $fk->onUpdate($refer['on_update']);
     }
 
-    // foreach ($this->foreignKeys as $foreign => $refer) {
-    //   @list($references, $table, $constraint) = $refer;
-    //   $key = $this->generateIndexName($foreign, 'foreign');
-    //   $has = $this->hasIndex($foreign, 'foreign');
-    //   dd($key, $has);
-    //   if ($has) $blueprint->dropIndex($key);
-
-    //   $fk = $blueprint->foreign($foreign)->references($references)->on($table);
-    //   $constraint = $constraint ?: [];
-    //   $constraint = array_keys(array_values($constraint)) === array_keys($constraint) ?
-    //     array_flip($constraint) : $constraint;
-    //     
-    //   foreach ($constraint as $handler => $val) {
-    //     if (is_int($handler)) {
-    //       $handler = $val;
-    //       $val = 'RESTRICT';
-    //     }
-    //     if (!method_exists($fk, $handler)) continue;
-    //     $val = is_int($val) ? 'RESTRICT' : $val;
-    //     $val = is_array($val) ? $val : [$val];
-    //     $fk->$handler(...$val);
-    //   }
-    // }
     $this->foreigns = [];
     return $this;
+  }
+
+  protected function parseIndexColumns(array $columns): array {
+    $type = 'index';
+    $args = [];
+    $columns = array_filter($columns, function ($column) use (&$args) {
+      if (!is_array($column)) return true;
+      $args = array_merge($args, $column);
+      return false;
+    });
+
+    if ($_type = $args['type'] ?? null) {
+      $type = $_type;
+      unset($args['type']);
+    }
+
+    return [$type, $columns, $args];
+  }
+
+  /**
+   * foreach index to migration
+   * */
+  public function setIndex(Blueprint $blueprint, array $index) {
+    $table = $this->table ?: $blueprint->getTable();
+    $indexes = [];
+    foreach ($index as $key => $columns) {
+      [$type, $columns, $args] = $this->parseIndexColumns(
+        is_array($columns) ? $columns : [$columns]
+      );
+
+      if (is_numeric($key)) $key = $this->generateIndexName($columns, $type, $table);
+
+      if ('fulltext' == strtolower($type)) {
+        $type = 'fullText';
+        $type = 'index';
+        // 驱动不支持fullText
+        //if (!method_exists($blueprint, $type)) $type = 'index';
+      }
+
+      if ($this->hasIndex($columns, $type, $table)) continue;
+      dd($key, $type, $columns, $args);
+      $set = $blueprint->$type($columns);
+      if ($args) foreach ($args as $k => $v) $set->$k($v);
+      $indexes[$key] = $set;
+    }
   }
 
   /**
@@ -366,25 +395,41 @@ class Table {
     $this->blueprint = null;
     $options['has'] = $has = Schema::hasTable($table);
     $method = $has ? 'table' : 'create';
-    //dd($table, $fieldset, $options);
+    $connection = $options['connection'] ?? config('database.default');
 
     Schema::$method($table, function(Blueprint $blueprint) use($fieldset, $options) {
       $this->setColumns($blueprint, $fieldset)->comment($options['comment'] ?? null);
 
-      if ($engine = $options['engine'] ?? null) $blueprint->engine = $engine;
+      if ($engine = $options['engine'] ?? null) $blueprint->engine($engine);
+      if ($charset = $options['charset'] ?? null) $blueprint->charset($charset);
+      if ($collation = $options['collation'] ?? null) $blueprint->collation($collation);
+      if ($temporary = $options['temporary'] ?? null) $blueprint->temporary();
 
       if (is_array($dropColumns = $options['drop_columns'] ?? null)) {
         foreach ($dropColumns as $column) {
-          if (Schema::hasColumn($blueprint->getTable(), $column)) $blueprint->dropColumn($column);
+          if (Schema::hasColumn($blueprint->getTable(), $column))
+            $blueprint->dropColumn($column);
         }
       }
 
       if ($this->foreignKeys) $this->foreignsBinding($blueprint);
 
+      if ($index = $options['index'] ?? false) {
+        if (is_array($index)) $index = fn($blueprint) => $this->setIndex($blueprint, $index);
+        if (is_callable($index)) $index($blueprint);
+      }
+
       $migration = $options['migration'] ?? false;
       if ($migration instanceof Closure) $migration($blueprint, $this);
       $this->blueprint = $blueprint;
     });
+
+    $seeds = $options['seeds'] ?? false;
+    if (is_array($seeds)) {
+      if (array_values($seeds) !== $seeds) $seeds = [$seeds];
+      $seeds = fn($db) => collect($seeds)->each(fn($seed) => $db->insertOrIgnore($seed));
+    }
+    if (is_callable($seeds)) $seeds(DB::table($table));
   }
 
   public function getName() {

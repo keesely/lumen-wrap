@@ -23,6 +23,8 @@ class SchemaTable {
 
   protected $foreigns = [];
 
+  static protected $migrations = [];
+
   public function __construct() {
     DBALType::addType('tinyinteger' , DBALTypes\TinyIntegerType::class);
     DBALType::addType('timestamp'   , DBALTypes\TimestampType::class);
@@ -63,10 +65,32 @@ class SchemaTable {
   }
 
   protected function importStructs(array $structs, Closure $callable = null) {
+    $i = 0;
     foreach ($structs as $tab => $struct) {
+      $i++;
       if (!is_array($struct)) {
         throw new SchemaException("TABLE {$tab} Struct is empty!");
       }
+
+      $code = serialize(new \Laravel\SerializableClosure\SerializableClosure(function () use($tab, $struct) {
+        return [$tab, $struct];
+      }));
+      $code = base64_encode($code);
+
+      $stub = $this->getStub();
+      $stub = file_get_contents($stub);
+      $stub = str_replace('{{ table }}', $tab, $stub);
+      $stub = str_replace('{{ code }}', $code, $stub);
+      $type = Schema::hasTable($tab) ? 'update' : 'create';
+      $istr = str_pad($i, 2, '0', STR_PAD_LEFT);
+      $hash = substr(md5($code), 0, 8);
+
+      // 查询是否已经导入
+      if ($this->hasImported($tab, $hash)) continue;
+
+      $migration_name = date('Y_m_d_His').$istr.'_'.str_replace(' ', '_', $tab).'_'.$type.'_'.$hash;
+      file_put_contents(base_path('database/migrations/'.$migration_name.'.php'), $stub);
+      continue;
 
       $table = new Table($tab);
       $table->build($struct['fieldset'] ?? [], [
@@ -88,6 +112,18 @@ class SchemaTable {
       ->getDoctrineSchemaManager()
       ->getDatabasePlatform()
       ->registerDoctrineTypeMapping('enum', 'enum');
+  }
+
+  protected function getStub() {
+    return __DIR__.'/stubs/migration.stub';
+  }
+
+  protected function hasImported($tab, $hash) {
+    if (!count(static::$migrations)) static::$migrations = DB::table('migrations')->pluck('migration');
+    foreach (static::$migrations as $migration) {
+      if (str_contains($migration, $tab) && str_contains($migration, $hash)) return true;
+    }
+    return false;
   }
 
   public function __call($name, $args) {

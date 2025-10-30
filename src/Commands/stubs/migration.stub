@@ -1,0 +1,65 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Arr;
+use Lx\Database\Table;
+
+return new class extends Migration
+{
+
+    /**
+     * The database connection that should be used.
+     * @var string
+     * */
+    protected $connection = '{{ connection }}';
+
+    protected $table = '{{ table }}';
+
+    protected $fieldset = [];
+
+    protected $options = [];
+
+    /**
+    * migration code to struct data
+    *
+    * @return array
+    * */
+    public function __construct ()
+    {
+      $code = base64_decode('{{ code }}');
+      [$table, $struct] = unserialize($code)();
+
+      $this->table = $table;
+
+      $this->fieldset = $struct['fieldset'] ?? [];
+
+      $options = Arr::except($struct, ['name', 'fieldset', 'timestamps', 'comment']);
+      $options = array_merge($options, [
+        'timestamps'   => $struct['timestamps'] ?? false,
+        'comment'      => $struct['comment'] ?? $struct['name'] ?? null,
+      ]);
+
+      $this->options = $options;
+    }
+
+    /**
+     * Run the migrations.
+     * */
+    public function up(): void
+    {
+      $up = new Table('{{ table }}');
+
+      $up->build($this->fieldset, $this->options);
+    }
+
+    /**
+     * Reverse the migrations.
+     * */
+    public function down(): void
+    {
+      $downHander = Arr::get($this->options, 'down', null);
+      if (is_callable($downHander)) $downHander($this->table);
+    }
+};
