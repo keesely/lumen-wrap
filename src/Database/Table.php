@@ -62,7 +62,7 @@ class Table {
     return Schema::hasIndex(
       $table, 
       $this->generateIndexName($columns, $indexType, $table),
-      $indexType,
+      strtolower($indexType) == 'index' ? null : $indexType
     );
   }
 
@@ -343,7 +343,8 @@ class Table {
     });
 
     if ($_type = $args['type'] ?? null) {
-      $type = $_type;
+      $type = strtolower($_type);
+      if (!in_array($type, ['index', 'unique', 'primary'])) $type = 'index';
       unset($args['type']);
     }
 
@@ -362,17 +363,20 @@ class Table {
       );
 
       if (is_numeric($key)) $key = $this->generateIndexName($columns, $type, $table);
-
-      if ('fulltext' == strtolower($type)) {
-        $type = 'fullText';
-        $type = 'index';
-        // 驱动不支持fullText
-        //if (!method_exists($blueprint, $type)) $type = 'index';
+      else {
+        $hasIndex = false;
+        foreach (Schema::getIndexes($table) as $index) {
+          if ($index['name'] == $key) {
+            $hasIndex = true;
+            break;
+          }
+        }
+        if ($hasIndex) continue;
       }
 
       if ($this->hasIndex($columns, $type, $table)) continue;
-      dd($key, $type, $columns, $args);
-      $set = $blueprint->$type($columns);
+
+      $set = $blueprint->$type($columns, $key);
       if ($args) foreach ($args as $k => $v) $set->$k($v);
       $indexes[$key] = $set;
     }
