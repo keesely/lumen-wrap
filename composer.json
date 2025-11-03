@@ -10,7 +10,11 @@
   },
   "require": {
     "php": "^8.2",
-    "laravel/lumen-framework": "^11.0"
+    "laravel/lumen-framework": "^11.0",
+    "league/commonmark": "^2.7",
+    "league/flysystem": "^3.25.1",
+    "league/flysystem-local": "^3.25.1",
+    "league/uri": "^7.5.1"
   },
   "require-dev": {
     "doctrine/dbal": "^4.3",

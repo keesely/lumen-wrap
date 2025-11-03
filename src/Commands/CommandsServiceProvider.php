@@ -17,6 +17,7 @@ class CommandsServiceProvider extends ServiceProvider {
       'MiddlewareMake' => 'command.middleware.make',
       'ModelMake'      => 'command.model.make',
       'MigrateTables'  => 'command.migrate.tables',
+      //'VendorPublish'   => 'command.vendor.publish',
     ];
 
     /**
