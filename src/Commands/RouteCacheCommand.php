@@ -66,7 +66,11 @@ class RouteCacheCommand extends Command
    */
   public function handle()
   {
-    $this->files->delete($this->laravel->getCachedRoutesPath());
+    if (!$router = $this->laravel['router'] ?? null) {
+      return $this->error('Router not found.');
+    }
+
+    if ($router->isCached()) $this->files->delete($router->getCachedRoutesPath());
     if ('clear' === $this->argument('op')) {
       return $this->info('Route cache cleared successfully.');
     }
@@ -77,8 +81,12 @@ class RouteCacheCommand extends Command
       return $this->error("Your application doesn't have any routes.");
     }
 
+    // if path is not writable
+    $this->files->ensureDirectoryExists(dirname($router->getCachedRoutesPath()));
+
     $this->files->put(
-      $this->laravel->getCachedRoutesPath(), $this->buildRouteCacheFile($routes)
+      $router->getCachedRoutesPath(), 
+      $this->buildRouteCacheFile($routes)
     );
 
     $this->info('Routes cached successfully.');

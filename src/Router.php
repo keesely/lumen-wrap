@@ -4,6 +4,7 @@ namespace Lx;
 
 use Laravel\Lumen\Routing\Router as LumenRouter;
 use Laravel\Lumen\Routing\Controller as BaseController;
+use Laravel\SerializableClosure\SerializableClosure;
 use Illuminate\Support\Arr;
 use Exception as RouterException;
 
@@ -16,6 +17,8 @@ class Router extends LumenRouter {
   protected $domainStack = [];
 
   protected $regexAliases = [];
+
+  protected $loaded = false;
 
   const DEFAULT_CONTROLLER_ACTIONS = [
     '@index'   => ['GET'   , '/'],
@@ -384,6 +387,42 @@ class Router extends LumenRouter {
     if (is_callable($callback)) $callback($this);
 
     array_pop($this->groupStack);
+  }
+
+  public function getCachedRoutesPath() {
+    return $this->app->storagePath('app/cache/routes.php');
+  }
+
+  public function isCached () {
+    return file_exists($this->getCachedRoutesPath());
+  }
+
+  public function isLoaded () {
+    return $this->loaded;
+  }
+
+  public function loadCachedRoutes () {
+    if ($this->loaded) return $this;
+    $router = $this;
+    require $this->getCachedRoutesPath();
+  }
+
+  public function setCompiledRoutes(array $routes) {
+    $closures = $routes['closures'] ?? function () { return []; };
+    $closures = unserialize($closures)->getClosure();
+
+    Routing\RouteClosure::setClosures($closures());
+    $routes = $routes['routes'] ?? $routes;
+    $this->routes = $routes;
+    $this->loaded = true;
+    return $this;
+  }
+
+  public function refresh() {
+    $this->loaded = false;
+    $this->routes = [];
+    $this->loadCachedRoutes();
+    return $this;
   }
 
 }

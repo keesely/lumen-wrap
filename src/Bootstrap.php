@@ -76,7 +76,14 @@ class Bootstrap extends Application {
    * @return void
    * */
   public function bootstrapRouter() {
-    $this->router = new Router($this);
+    if ($router = $this['router'] ?? null) $this->router = $router;
+    else $this->router = $this->instance('router', new Router($this));
+
+    // is cached routes?
+    if ($this->router->isLoaded()) return $this;
+    if ($this->router->isCached()) $this->router->loadCachedRoutes();
+
+    return $this;
   }
 
   /**
@@ -183,8 +190,10 @@ class Bootstrap extends Application {
    * */
 
   public function __call($name, $args) {
-    call_user_func_array([$this->app, $name], $args);
-    return $this;
+    if (method_exists($this->app, $name))
+      return call_user_func_array([$this->app, $name], $args);
+
+    return $this->app->make($name, $args);
   }
   
 }

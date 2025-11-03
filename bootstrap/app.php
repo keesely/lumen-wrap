@@ -72,6 +72,15 @@ $app = new Lx\Bootstrap(BASE_PATH);
 
 $app->configure('app');
 
+$app->singleton(
+  Illuminate\Contracts\Debug\ExceptionHandler::class,
+  Laravel\Lumen\Exceptions\Handler::class
+);
+$app->singleton(
+  Illuminate\Contracts\Console\Kernel::class,
+  Laravel\Lumen\Console\Kernel::class
+);
+
 $app->tap(fn($app) => $app->router->group([
   'routes' => 'config/routes.php',
 ]));
