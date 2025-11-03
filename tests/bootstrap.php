@@ -1,5 +1,8 @@
 <?php
 
+defined('BASE_PATH') || define('BASE_PATH', realpath(dirname(__DIR__)));
+defined('VENDOR_PATH') || define('VENDOR_PATH', BASE_PATH . '/vendor/');
+
 /*
 |--------------------------------------------------------------------------
 | Register The Composer Auto Loader
@@ -11,8 +14,9 @@
 | loading of any our classes "manually". Feels great to relax.
 |
 */
+require_once VENDOR_PATH . '/autoload.php';
 
-require __DIR__.'/../vendor/autoload.php';
+(new Laravel\Lumen\Bootstrap\LoadEnvironmentVariables(BASE_PATH))->bootstrap();
 
 /*
 |--------------------------------------------------------------------------
@@ -28,3 +32,53 @@ require __DIR__.'/../vendor/autoload.php';
 date_default_timezone_set('UTC');
 
 Carbon\Carbon::setTestNow(Carbon\Carbon::now());
+
+/**
+ * public Bootstrap (AppPath, envPath) initialize
+ * */
+$app = new Lx\Bootstrap(BASE_PATH);
+
+/*
+|--------------------------------------------------------------------------
+| Register Container Bindings
+|--------------------------------------------------------------------------
+|
+| Now we will register a few bindings in the service container. We will
+| register the exception handler and the console kernel. You may add
+| your own bindings here if you like or you can make another file.
+|
+ */
+
+// $app->singleton(
+//   Illuminate\Contracts\Debug\ExceptionHandler::class,
+//   App\Exceptions\Handler::class
+// );
+// 
+// $app->singleton(
+//   Illuminate\Contracts\Console\Kernel::class,
+//   App\Console\Kernel::class
+// );
+
+/*
+|--------------------------------------------------------------------------
+| Register Config Files
+|--------------------------------------------------------------------------
+|
+| Now we will register the "app" configuration file. If the file exists in
+| your configuration directory it will be loaded; otherwise, we'll load
+| the default version. You may register other files below as needed.
+|
+ */
+
+$app->configure('app');
+
+$app->tap(fn($app) => $app->router->group([
+  'routes' => 'config/routes.php',
+]));
+
+$app->tap(fn($app) => $app->register(Lx\Commands\CommandsServiceProvider::class));
+
+
+//$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+
+return $app;
