@@ -53,9 +53,13 @@ class Bootstrap extends Application {
   protected function loadConfigure(array $configure) {
     $config = $this->app['config'] ?: $this->app->make('config');
 
-    foreach ($configure as $conf) {
-      if (is_array($conf))
-        foreach ($conf as $key => $value) $config->set($key, $value);
+    foreach ($configure as $name => $conf) {
+      if (is_array($conf)) {
+        if (is_numeric($name)) {
+          foreach ($conf as $key => $value) $config->set($key, $value);
+        }
+        else $config->set($name, $conf);
+      }
       else if ($path = $this->getConfigurationPath($conf)) $config->set($conf, require $path);
       else $this->app->configure($conf);
     }

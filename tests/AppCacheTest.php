@@ -1,11 +1,7 @@
 <?php
 
-use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Output\NullOutput;
-use Symfony\Component\Console\Output\ConsoleOutput;
-use Symfony\Component\Console\Output\OutputInterface;
 
-class RouteCacheTest extends TestCase
+class AppCacheTest extends TestCase
 {
 
   public function testRouteCache()
@@ -44,5 +40,14 @@ class RouteCacheTest extends TestCase
 
     $this->assertFalse($router->isCached(), 'Router is cached');
     $this->assertFalse($router->isLoaded(), 'Router is loaded');
+  }
+
+  public function testConfigCache()
+  {
+    $command = 'config:cache';
+    $kernel = $this->app[Laravel\Lumen\Console\Kernel::class];
+    $res = $kernel->call($command, []);
+
+    dd($res);
   }
 }

@@ -28,16 +28,17 @@ class CommandsServiceProvider extends ServiceProvider {
      * @return void
      */
     protected function registerCommands() {
-        // @Change Extract dev Commands Running
-        if ($this->app['config']->get('app.env') != 'production') {
-          foreach ($this->extCommands as $command => $single) {
-            $this->{"register{$command}Command"}($command, $single);
-          }
-          //$commands = array_merge($commands, $this->extCommands);
-          $commands = $this->extCommands;
+      $commands = [];
+      // @Change Extract dev Commands Running
+      if ($this->app['config']->get('app.env') != 'production') {
+        foreach ($this->extCommands as $command => $single) {
+          $this->{"register{$command}Command"}($command, $single);
         }
+        //$commands = array_merge($commands, $this->extCommands);
+        $commands = $this->extCommands;
+      }
 
-        $this->commands(array_values($commands));
+      $this->commands(array_values($commands));
     }
 
     public function register() {

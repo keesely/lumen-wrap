@@ -111,7 +111,7 @@ class RouteCacheCommand extends Command
           $closures[$hash] = $closure;
           unset($action[0]);
           $action['hash'] = $hash;
-          $action['uses'] = '\Lex\RouteClosure@closure';
+          $action['uses'] = '\Lx\Routing\RouteClosure@closure';
         }
       }
       $closures = serialize(new SerializableClosure(function () use($closures) {

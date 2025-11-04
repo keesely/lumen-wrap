@@ -290,12 +290,13 @@ class Router extends LumenRouter {
   protected function _getRoutes () {
     $domain = $this->server_host()[1];
     $routes = self::$_routes; // ?: $this->routes;
+
     foreach ($routes as $host => $router) {
       if (preg_match('/^'.$host.'$/si', $domain)) {
         return $router;
       }
     }
-    return $routes[0];
+    return $routes[0] ?? $routes;
   }
 
   public function getRoutes () {
@@ -362,9 +363,9 @@ class Router extends LumenRouter {
    * @param  \Closure  $callback
    * @return void
    *
-   * @Change $callback is default null
+   * @Change $callback is default null is deprecated, the explicit routes should be defined in $attributes
    */
-  public function group(array $attributes, \Closure $callback = null) {
+  public function group(array $attributes, \Closure $callback) {
     if (isset($attributes['middleware']) && is_string($attributes['middleware'])) {
       $attributes['middleware'] = explode('|', $attributes['middleware']);
     }
@@ -387,6 +388,25 @@ class Router extends LumenRouter {
     if (is_callable($callback)) $callback($this);
 
     array_pop($this->groupStack);
+  }
+
+  public function setting (array $attributes) {
+    $routes = $attributes['routes'] ?? null;
+
+    $callback = fn($router) => abort(404, 'Not Found');
+
+    if($routes) {
+      $routes = is_array($routes) ? $routes : [$routes];
+      
+      $routes = array_map(fn($f) => $this->app->basePath($f), $routes);
+      $reqRoutes = function ($router, $routes) {
+        foreach ($routes as $route) {
+          file_exists($route) && require $route;
+        }
+      };
+      $callback = fn($router) => $reqRoutes($router, $routes);
+    }
+    return $this->group($attributes, $callback);
   }
 
   public function getCachedRoutesPath() {
