@@ -61,5 +61,6 @@ return new class extends Migration
     {
       $downHander = Arr::get($this->options, 'down', null);
       if (is_callable($downHander)) $downHander($this->table);
+      else Schema::dropIfExists($this->table);
     }
 };

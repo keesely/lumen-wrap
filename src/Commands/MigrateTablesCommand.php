@@ -7,6 +7,7 @@ use Cache;
 use Illuminate\Console\Command;
 use Illuminate\Database\Schema\Blueprint;
 use Laravel\SerializableClosure\SerializableClosure;
+use Illuminate\Support\Facades\Schema;
 use Lx\Database\SchemaTable;
 
 class MigrateTablesCommand extends Command {
@@ -48,9 +49,12 @@ class MigrateTablesCommand extends Command {
           'connection' => $struct['connection'] ?? config('database.default'),
         ]);
 
+        $hasTable = Schema::hasTable($tab);
+
         $istr = str_pad($i, 2, '0', STR_PAD_LEFT);
         $name = implode('_', [
           date('Y_m_d_His'). $istr,
+          $hasTable ? 'update' : 'create',
           str_replace(' ', '_', $tab),
           $hash
         ]);

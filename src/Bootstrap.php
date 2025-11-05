@@ -27,8 +27,9 @@ class Bootstrap extends Application {
 
     // load configure from config/app.php
     $this->loadConfigure(config('app.configure', []));
+    if (is_array($providers = config('app.providers'))) $this->with(...$providers);
     // register providers
-    $this->registerProviders(config('app.providers', []));
+    //$this->registerProviders(config('app.providers', []));
     // register middlewares && route middlewares
     $this->app->middleware(config('app.middleware', []));
     $this->app->routeMiddleware(config('app.routeMiddleware', []));
@@ -155,6 +156,12 @@ class Bootstrap extends Application {
     });
   }
 
+  /**
+   * With Providers register.
+   * @param string|array|callable ...$providers
+   *
+   * @return Bootstrap
+   * */
   public function with(string|array|callable...$providers) {
     foreach ($providers as $provider) {
       if (is_string($provider)) {
@@ -164,9 +171,8 @@ class Bootstrap extends Application {
       }
 
       else if (is_callable($provider)) $provider($this);
-      else if (is_array($provider)) {
-        foreach ($provider as $p) $this->app->register($p);
-      }
+      // @Change if isArray $provider then with(...$provider)
+      else if (is_array($provider)) $this->with(...$provider);
     }
     return $this;
   }
