@@ -48,6 +48,6 @@ if (!function_exists('get_client_ip')) {
       '0.0.0.0',
     ]);
 
-    return $showall ? $ips : $ips[0];
+    return $showall ? $ips : current($ips);
   }
 }

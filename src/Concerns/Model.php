@@ -35,7 +35,16 @@ trait Model {
       config('app.timezone'),
       'UTC',
     ]))[0];
-    return $date->tz($tz)->format('Y-m-d H:i:s');
+    return $date->tz($tz)->format('c');
+  }
+
+  /**
+   * Get the database connection instance.
+   * 
+   * @return \Illuminate\Database\Connection
+   * */
+  protected function db($raw = null) {
+    return tap(app('db'), fn ($db) => $raw ? $db->raw($raw) : $db);
   }
 
   /**
@@ -99,12 +108,14 @@ trait Model {
       $row->_extrattrs = $attrs->only($row->ignored)->toArray();
     }
 
-    if ($row->isDirty() && ($dirty = $row->getDirty()) && method_exists($row, 'beChange')) {
-      $row->beChange(
-        $original = collect($row->getOriginal())->only(array_keys($dirty)),
-        $values = collect($row->toArray())->only(array_keys($dirty)),
-      );
-    }
+    [$isDirty, $values, $original] = $this->watchChange();
+    if ($isDirty && method_exists($row, 'beChanging')) $row->beChanging($values, $original);
+    // if ($row->isDirty() && ($dirty = $row->getDirty()) && method_exists($row, 'beChange')) {
+    //   $row->beChange(
+    //     $original = collect($row->getOriginal())->only(array_keys($dirty)),
+    //     $values = collect($row->getAttributes())->only(array_keys($dirty)),
+    //   );
+    // }
   }
 
   /**
@@ -113,5 +124,21 @@ trait Model {
   public function fireSavedEvent($row) {
     $row->attributes = array_merge($row->attributes, $this->_extrattrs ?: []);
     $this->_extrattrs = [];
+
+    [$isDirty, $values, $original] = $this->watchChange();
+    if ($isDirty && method_exists($row, 'beChanged')) $row->beChanged($values, $original);
   }
+
+  protected function watchChange(): array {
+    $dirtyKeys = array_keys($this->getDirty());
+    $dirtys = collect($dirtyKeys)->combine(array_pad([], count($dirtyKeys), null));
+    $original = $this->getOriginal();
+    return [
+      $this->isDirty(),
+      $dirtys->map(fn ($val, $key) => $this->$key),
+      collect($original)->only($dirtyKeys),
+      //collect($this->getOriginal())->only($dirtyKeys)->toArray(),
+    ];
+  }
+
 }
