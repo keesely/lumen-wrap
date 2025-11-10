@@ -124,6 +124,12 @@ class Bootstrap extends Application {
     return $this;
   }
 
+  public function withJwt() {
+    $this->app->singleton('jwt', fn() => new Support\Jwt );
+      
+    return $this;
+  }
+
   public function withFilesystem() {
     $this->configure('filesystems');
     $this->app->bind(\Illuminate\Contracts\Filesystem\Factory::class, function ($app) {
