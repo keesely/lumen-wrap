@@ -31,7 +31,7 @@ use DateTimeImmutable;
 
 class Jwt implements Arrayable, ArrayAccess, Stringable
 {
-  
+
   const SIGNER_SHA256 = Signer\Hmac\Sha256::class;
   const SIGNER_SHA384 = Signer\Hmac\Sha384::class;
   const SIGNER_SHA512 = Signer\Hmac\Sha512::class;
@@ -77,36 +77,37 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
   ];
 
   protected $allows = [
-      'jti'           => 'identifiedBy',
-      'setId'         => 'identifiedBy', // jti
-      'getId'         => 'jti',
+    'jti'           => 'identifiedBy',
+    'setId'         => 'identifiedBy', // jti
+    'getId'         => 'jti',
 
-      'iss'           => 'issuedBy',
-      'setIssuer'     => 'issuedBy', // iss
-      'getIssuer'     => 'iss',
+    'iss'           => 'issuedBy',
+    'setIssuer'     => 'issuedBy', // iss
+    'getIssuer'     => 'iss',
 
-      'iat'           => ['issuedAt', 'formatTime'],
-      'setIssuedAt'   => ['issuedAt', 'formatTime'], // iat
-      'issuedAt'      => ['issuedAt', 'formatTime'],
-      'getIssuedAt'   => 'iat',
+    'iat'           => ['issuedAt', 'formatTime'],
+    'setIssuedAt'   => ['issuedAt', 'formatTime'], // iat
+    'issuedAt'      => ['issuedAt', 'formatTime'],
+    'getIssuedAt'   => 'iat',
 
-      'aud'           => 'permittedFor',
-      'setAudience'   => 'permittedFor', // aud
-      'getAudience'   => 'aud',
+    'aud'           => 'permittedFor',
+    'setAudience'   => 'permittedFor', // aud
+    'getAudience'   => 'aud',
 
-      'exp'           => ['expiresAt', 'formatTime'],
-      'setExpiration' => ['expiresAt', 'formatTime'], // exp
-      'expiresAt'     => ['expiresAt', 'formatTime'],
-      'getExpiration' => 'exp',
+    'exp'           => ['expiresAt', 'formatTime'],
+    'setExpiration' => ['expiresAt', 'formatTime'], // exp
+    'setExpires'  => ['expiresAt', 'formatTime'],
+    'expiresAt'     => ['expiresAt', 'formatTime'],
+    'getExpiration' => 'exp',
 
-      'nbf'           => ['canOnlyBeUsedAfter', 'formatTime'],
-      'setNotBefore'  => ['canOnlyBeUsedAfter', 'formatTime'], // nbf
-      'canOnlyBeUsedAfter' => ['canOnlyBeUsedAfter', 'formatTime'],
-      'getNotBefore'  => 'nbf',
+    'nbf'           => ['canOnlyBeUsedAfter', 'formatTime'],
+    'setNotBefore'  => ['canOnlyBeUsedAfter', 'formatTime'], // nbf
+    'canOnlyBeUsedAfter' => ['canOnlyBeUsedAfter', 'formatTime'],
+    'getNotBefore'  => 'nbf',
 
-      'sub'           => 'relatedTo',
-      'setSubject'    => 'relatedTo', // sub
-      'getSubject'    => 'sub',
+    'sub'           => 'relatedTo',
+    'setSubject'    => 'relatedTo', // sub
+    'getSubject'    => 'sub',
   ];
 
 
@@ -114,7 +115,7 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
 
   protected $parser;
 
-  protected $_token;
+  protected $token;
 
   /**
    * Get signers supported
@@ -147,9 +148,8 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    * @return Lcobucci\JWT\Signer\Key\InMemory
    * */
   protected function parseKey ($key) {
-    if (empty($key) || !is_string($key)) 
-      return InMemory::plainText(str_pad(config('app.key', ''), 32, "\0"));
-    if (is_file($key)) return InMemory::file($key);
+    if (is_object($key) && $key instanceof Signer\Key) return $key;
+    if (is_file($key) && file_exists($key)) return InMemory::file($key);
     return InMemory::plainText(str_pad($key, 32, "\0"));
   }
 
@@ -162,14 +162,14 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    * */
   protected function formatTime($value): ?DateTimeImmutable {
     switch (gettype($value)) {
-      case 'integer':
-        return new DateTimeImmutable("@{$value}");
-      case 'string':
-        return new DateTimeImmutable($value);
-      case 'object':
-        if ($value instanceof DateTimeInterface) return $value;
-        if ($value instanceof Carbon) return $value->toDateTimeImmutable();
-        return $value;
+    case 'integer':
+      return new DateTimeImmutable("@{$value}");
+    case 'string':
+      return new DateTimeImmutable($value);
+    case 'object':
+      if ($value instanceof DateTimeInterface) return $value;
+      if ($value instanceof Carbon) return $value->toDateTimeImmutable();
+      return $value;
     }
   }
 
@@ -210,10 +210,14 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    *
    * */
   public function getToken(): string {
-    @[$key, $signer] = array_pad($this->signature?: [], 2, null);
+    @[$key, $signer] = array_pad($this->signature?: [], 2, '');
     $signer = $this->getSigner($signer ?: 'HS256');
-    $this->_token = $this->builder->getToken($signer, $this->parseKey($key));
-    return $this->_token->toString();
+    if (!$this->token) {
+      $this->token = $this->build()
+                          ->getBuilder()
+                          ->getToken($signer, $this->parseKey($key));
+    }
+    return $this->token->toString();
   }
 
   public function getBuilder() {
@@ -234,19 +238,8 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     return [
       'headers' => $this->headers,
       'claims' => $this->claims,
-      'signature' => $this->signature,
       'token' => $this->toString(),
     ];
-
-    if (!$this->parser) return [];
-    $data = [
-      'headers' => $this->getHeaders(),
-    ];
-    $claims = $this->getClaims();
-    $data = array_merge($data, Arr::only($claims, static::RESERVED_CLAIMS));
-    $data['claims'] = Arr::except($claims, static::RESERVED_CLAIMS);
-
-    return $data;
   }
 
   public function getHeaders(): array {
@@ -265,6 +258,9 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     return Arr::get($this->claims, $name);
   }
 
+  public function getSignature(): array {
+    return $this->signature ?: [];
+  }
 
   public function withHeaders(array $headers): Jwt {
     foreach ($headers as $key => $value) {
@@ -318,7 +314,6 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    * */
   public function NewBuilder (array $options = []) {
     $this->builder = new Builder(new JoseEncoder, ChainedFormatter::default());
-    return $this;
 
     $jti = $options['id'] ?? $options['jti'] ?? uniqid();
     $this->withClaim('setId', $jti);
@@ -340,8 +335,10 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     if (count($data) > 0) $this->withClaims($data); 
 
     $signer = $options['signer'] ?? null;
-    @[$signer, $key] = is_array($signer) ? $signer : [$signer, ''];
-    if ($signer && $key) $this->sign($signer, $key);
+    if ($signer) {
+      @[$signer, $key] = is_array($signer) ? $signer : ['HS256', $signer];
+      if ($signer && $key) $this->sign($key, $signer);
+    }
 
     return $this;
   }
@@ -383,14 +380,16 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
   }
 
   public function isValid($key, $strict = false) {
-    $signer = $this->getSinger($this->getHeader('alg'));
+    $signer = $this->getSigner($this->getHeader('alg'));
     if (!$signer) throw new JwtTokenException('Invalid signer');
+    $key = $this->parseKey($key);
 
     try {
       (new Validator)->assert(
-          $this->parser, 
-          new Constraint\SignedWith(new $signer, $this->parseKey($key))
-        );
+        $this->parser, 
+        new Constraint\SignedWith($signer, $key)
+      );
+      $this->signature = [$key, $signer];
       return true;
     }
     catch (\Exception $e) {
@@ -488,7 +487,8 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     if (method_exists($this, $name)) {
       return call_user_func_array([$this, $name], $args);
     }
-    return $this;
+    throw new JwtTokenException('Method ('.$name.') not found');
+    //return $this;
   }
 }
 

@@ -81,7 +81,7 @@ $app->singleton(
   Laravel\Lumen\Console\Kernel::class
 );
 
-$app->tap(fn($app) => $app->router->group([
+$app->tap(fn($app) => $app->router->setting([
   'routes' => 'config/routes.php',
 ]));
 
