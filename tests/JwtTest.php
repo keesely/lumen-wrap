@@ -71,6 +71,10 @@ class JwtTest extends TestCase {
     $this->assertEquals($parsed->toArray(), $example);
     $this->assertTrue($parsed->isValid($signature));
     $this->assertFalse($parsed->isValid($signature.'0'));
+
+    $this->assertTrue(
+      (new Lx\Support\Jwt)->Verify($token, $signature, false)
+    );
   }
 
   public function testExpired() {

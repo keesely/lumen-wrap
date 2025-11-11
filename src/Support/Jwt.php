@@ -117,6 +117,10 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
 
   protected $token;
 
+  protected $jwk;
+
+  static protected $errors = [];
+
   /**
    * Get signers supported
    *
@@ -195,10 +199,10 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
   public function sign($key, $signer = 'HS256') {
     $builder = $this->getBuilder();
     if (!$signer = $this->getSigner($signer))
-      throw new JwtTokenException('Invalid signer');
+      throw new JwtTokenException('Invalid signer', JwtTokenException::INVALID_SIGNER);
 
     if (!in_array(get_class($signer), $this->getSigners())) 
-      throw new JwtTokenException('Unsupported signer');
+      throw new JwtTokenException('Unsupported signer', JwtTokenException::INVALID_SIGNER);
 
     $this->signature = [$this->parseKey($key), $signer];
     $this->headers['alg'] = $signer->algorithmId();
@@ -231,7 +235,7 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
   public function toString(): string {
     if ($this->builder) return $this->getToken();
     else if ($this->parser) return $this->parser->toString();
-    throw new JwtTokenException('Token not found');
+    throw new JwtTokenException('Token not found', JwtTokenException::TOKEN_NOT_FOUND);
   }
 
   public function toArray(): array {
@@ -314,31 +318,27 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    * */
   public function NewBuilder (array $options = []) {
     $this->builder = new Builder(new JoseEncoder, ChainedFormatter::default());
+    $this->jwk = null;
 
-    $jti = $options['id'] ?? $options['jti'] ?? uniqid();
-    $this->withClaim('setId', $jti);
+    $this->setId(uniqid());
 
-    if ($aud = $options['aud'] ?? null) $this->withClaim('aud', $aud);
-    if ($iss = $options['iss'] ?? null) $this->withClaim('iss', $iss);
-    if ($iat = $options['iat'] ?? null) $this->withClaim('iat', $iat);
-    if ($sub = $options['sub'] ?? null) $this->withClaim('sub', $sub);
-    if ($exp = $options['exp'] ?? null) $this->withClaim('exp', $exp);
+    $claims = $options['claims'] ?? [];
+    if (count($claims) > 0) $this->withClaims($claims);
 
-    if (is_array($headers = $options['headers'] ?? null)) {
-      $this->withHeaders($headers);
+    if (is_array($headers = $options['headers'] ?? null)) $this->withHeaders($headers);
+
+    [$signer, $key] = ['HS256', $this->get('jti')];
+    if (is_array($jwk = $options['jwk'] ?? null)) {
+      $this->withJwk($jwk);
+      $signer = $this->jwk['alg'] ?? null;
+      $key = $this->jwk['pem'] ?? null;
+    }
+    else if ($signer = $options['singer'] ?? null) {
+      if (!is_array($signer)) [$signer, $key] = ['HS256', $signer];
+      else @[$signer, $key] = $signer;
     }
 
-    $data = Arr::except($options, [
-      'id', 'jti', 'aud', 'iss', 'iat', 'sub', 'exp', 'headers',
-      'signer',
-    ]);
-    if (count($data) > 0) $this->withClaims($data); 
-
-    $signer = $options['signer'] ?? null;
-    if ($signer) {
-      @[$signer, $key] = is_array($signer) ? $signer : ['HS256', $signer];
-      if ($signer && $key) $this->sign($key, $signer);
-    }
+    if ($signer && $key) $this->sign($key, $signer);
 
     return $this;
   }
@@ -348,15 +348,30 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    * */
   public function Parse ($token, array $options = []) {
     try {
-      $this->parser = new Parser(new JoseEncoder)->parse(trim($token));
-
-      $verify = $options['verify'] ?? [];
-      @[$signer, $key] = is_array($verify) ? $verify : [$verify, ''];
-      if ($signer && $key && !$this->isValid($signer, $key)) return false;
-
       $this->builder = null;
+      $this->parser = new Parser(new JoseEncoder)->parse(trim($token));
       $this->headers = $this->parser->headers()->all();
       $this->claims = $this->parser->claims()->all();
+
+      $key = $options['key'] ?? null;
+      if ($jwk = $options['jwk'] ?? null) {
+        $this->withJwk($jwk);
+        if (($kid = $this->jwk['kid'] ?? null) && $kid != $this->getHeader('kid')) {
+          throw new JwtTokenException("Invalid token With kid: {$kid}", JwtTokenException::TOKEN_INVALID);
+        }
+        $key = $this->jwk['pub'] ?? null;
+      }
+
+      if ($key && !$this->isValid($key)) {
+        $signer = $this->getSigner($this->getHeader('alg'));
+        $keyType = $signer->algorithmId();
+        throw new JwtTokenException("Invalid token With {$keyType}", JwtTokenException::TOKEN_INVALID);
+      }
+
+      if (($options['expired'] ?? false)) {
+        [$isExp, $exp] = $this->isExpired($expired);
+        if ($isExp) throw new JwtTokenException('Token is expired at: '. $exp->format('Y-m-d H:i:s'), JwtTokenException::TOKEN_EXPIRED);
+      }
 
       return $this;
     } catch (\Exception $e) {
@@ -381,7 +396,7 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
 
   public function isValid($key, $strict = false) {
     $signer = $this->getSigner($this->getHeader('alg'));
-    if (!$signer) throw new JwtTokenException('Invalid signer');
+    if (!$signer) throw new JwtTokenException('Invalid signer', JwtTokenException::INVALID_SIGNER);
     $key = $this->parseKey($key);
 
     try {
@@ -398,16 +413,34 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     }
   }
 
-  public function Verify($token, $key) {
+  public function Verify($token, $key, $strict = false) {
+    static::$errors = [];
+
     try {
       $parse = (new Parser(new JoseEncoder))->parse(trim($token));
       $alg = $parse->headers()->get('alg');
-      (new Validator)->assert(
-        $parse,
-        new Constraint\SignedWith(new ($this->getSinger($alg)), $this->parseKey($key))
-      );
+      $kid = $parse->headers()->get('kid');
+
+      if (is_array($key)) {
+        if (($kid = $key['kid'] ?? null) && $kid != $parse->headers()->get('kid')) 
+          throw new JwtTokenException("Invalid token With kid: {$kid}", JwtTokenException::TOKEN_INVALID);
+        if(isset($key['pub'])) $key = InMemory::file($key['pub']);
+      }
+
+      $validator = new Validator;
+      $verify = new Constraint\SignedWith(new ($this->getSigner($alg)), $this->parseKey($key));
+      if ($exp = $parse->claims()->get('exp')) {
+        if ($exp->getTimestamp() <= time()) 
+          throw new JwtTokenException('Token is expired: '. $exp->format('Y-m-d H:i:s'), JwtTokenException::TOKEN_EXPIRED);
+      }
+
+      if (!$validator->validate($parse, $verify)) 
+        throw new JwtTokenException('Invalid token', JwtTokenException::TOKEN_INVALID);
+
       return $parse;
     } catch (\Exception $e) {
+      static::$errors = ['message' => $e->getMessage(), 'code' => $e->getCode()];
+      if (!$strict) return false;
       if ($e instanceof Validation\RequiredConstraintsViolated) {
         $e = $e->violations[0] ?? $e;
       }
@@ -422,6 +455,34 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     } catch (\Exception $e) {
       return false;
     }
+  }
+
+  public function Key($key, $keyType = 'default') {
+    switch ($keyType) {
+    case 'file':
+      return InMemory::file($key);
+    case 'plain':
+      return InMemory::plainText(str_pad($key, 32, "\0"));
+    case 'base64Encoded':
+      return InMemory::base64Encoded($key);
+    case 'default':
+      return $this->parseKey($key);
+    }
+  }
+
+  public function withJwk($jwk) {
+    $alg = $jwk['alg'] ?? null;
+    $kid = $jwk['kid'] ?? null;
+    $pub = $jwk['pub'] ?? null;
+    $pem = $jwk['pem'] ?? null;
+    if (!$alg && !$kid && !$pub && !$pem) throw new JwtTokenException('Invalid JWK', JwtTokenException::INVALID_JWK);
+    $this->jwk = [
+      'alg' => $alg,
+      'kid' => $kid,
+      'pub' => $this->Key($pub, 'file'),
+      'pem' => $this->Key($pem, 'file'),
+    ];
+    return $this;
   }
 
   public function set(string $name, mixed $value): Jwt {
@@ -487,9 +548,26 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     if (method_exists($this, $name)) {
       return call_user_func_array([$this, $name], $args);
     }
-    throw new JwtTokenException('Method ('.$name.') not found');
+    throw new \Exception('Method ('.$name.') not found');
     //return $this;
+  }
+
+  public function getErrors() {
+    return static::$errors;
   }
 }
 
-class JwtTokenException extends \Exception {}
+class JwtTokenException extends \Exception {
+  
+  const TOKEN_INVALID = 1101;
+  const TOKEN_EXPIRED = 1102;
+  const TOKEN_NOT_FOUND = 1103;
+  const TOKEN_INVALID_SIGNER = 1104;
+  const TOKEN_INVALID_HEADER = 1105;
+  const TOKEN_INVALID_CLAIM = 1106;
+  const INVALID_JWK = 1107;
+  const INVALID_KEY = 1108;
+  const INVALID_SIGNER = 1109;
+  const INVALID_HEADER = 1110;
+  const INVALID_CLAIM = 1111;
+}
