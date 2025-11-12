@@ -42,7 +42,7 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
   const SIGNER_ES384 = Signer\Ecdsa\Sha384::class;
   const SIGNER_ES512 = Signer\Ecdsa\Sha512::class;
 
-  const RESERVED_CLAIMS = ['jti', 'iss', 'iat', 'aud', 'exp', 'nbf', 'sub'];
+  //const RESERVED_CLAIMS = ['jti', 'iss', 'iat', 'aud', 'exp', 'nbf', 'sub'];
 
   protected $headers = ['typ' => 'JWT', 'alg' => 'HS256'];
 
@@ -152,7 +152,7 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
    * @return Lcobucci\JWT\Signer\Key\InMemory
    * */
   protected function parseKey ($key) {
-    if (is_object($key) && $key instanceof Signer\Key) return $key;
+    if (is_object($key) && ($key instanceof Signer\Key || $key instanceof InMemory)) return $key;
     if (is_file($key) && file_exists($key)) return InMemory::file($key);
     return InMemory::plainText(str_pad($key, 32, "\0"));
   }
@@ -353,9 +353,12 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
       $this->headers = $this->parser->headers()->all();
       $this->claims = $this->parser->claims()->all();
 
+      static::$errors = [];
       $key = $options['key'] ?? null;
+
       if ($jwk = $options['jwk'] ?? null) {
-        $this->withJwk($jwk);
+        $this->withJwk($jwk, $this->getHeader('kid'));
+
         if (($kid = $this->jwk['kid'] ?? null) && $kid != $this->getHeader('kid')) {
           throw new JwtTokenException("Invalid token With kid: {$kid}", JwtTokenException::TOKEN_INVALID);
         }
@@ -395,8 +398,19 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
   }
 
   public function isValid($key, $strict = false) {
-    $signer = $this->getSigner($this->getHeader('alg'));
-    if (!$signer) throw new JwtTokenException('Invalid signer', JwtTokenException::INVALID_SIGNER);
+    if (!$signer = $this->getSigner($this->getHeader('alg'))) {
+      throw new JwtTokenException('Invalid signer', JwtTokenException::INVALID_SIGNER);
+    }
+
+    if (is_array($key)) {
+      $kid = $this->getHeader('kid');
+      $key = $this->withJwk($key, $kid)->jwk;
+      if (($key['kid'] ?? null) != $kid) {
+        throw new JwtTokenException('Invalid token With kid: '.$kid, JwtTokenException::TOKEN_INVALID);
+      }
+      $key = $key['pub'] ?? null;
+    }
+
     $key = $this->parseKey($key);
 
     try {
@@ -422,9 +436,11 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
       $kid = $parse->headers()->get('kid');
 
       if (is_array($key)) {
-        if (($kid = $key['kid'] ?? null) && $kid != $parse->headers()->get('kid')) 
+        $key = $this->withJwk($key, $kid)->jwk ?: [];
+
+        if (($_kid = $key['kid'] ?? null) && ($_kid != $kid))
           throw new JwtTokenException("Invalid token With kid: {$kid}", JwtTokenException::TOKEN_INVALID);
-        if(isset($key['pub'])) $key = InMemory::file($key['pub']);
+        $key = $key['pub'] ?? null;
       }
 
       $validator = new Validator;
@@ -470,12 +486,20 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     }
   }
 
-  public function withJwk($jwk) {
+  public function withJwk(array $jwk, $kid = null) {
+    foreach ($jwk as $k => $v) {
+      if (is_array($v) && $kid && ($kid == $v['kid'] ?? null)) {
+        $jwk = $v;
+        break;
+      }
+    }
+
     $alg = $jwk['alg'] ?? null;
     $kid = $jwk['kid'] ?? null;
     $pub = $jwk['pub'] ?? null;
     $pem = $jwk['pem'] ?? null;
-    if (!$alg && !$kid && !$pub && !$pem) throw new JwtTokenException('Invalid JWK', JwtTokenException::INVALID_JWK);
+    if (!$alg && !$kid && !$pub && !$pem) 
+      throw new JwtTokenException('Invalid JWK', JwtTokenException::INVALID_JWK);
     $this->jwk = [
       'alg' => $alg,
       'kid' => $kid,

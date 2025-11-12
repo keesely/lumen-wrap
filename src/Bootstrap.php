@@ -28,6 +28,7 @@ class Bootstrap extends Application {
     // load configure from config/app.php
     $this->loadConfigure(config('app.configure', []));
     if (is_array($providers = config('app.providers'))) $this->with(...$providers);
+
     // register providers
     //$this->registerProviders(config('app.providers', []));
     // register middlewares && route middlewares
