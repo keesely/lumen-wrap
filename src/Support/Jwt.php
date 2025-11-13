@@ -282,6 +282,13 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
 
   public function withClaims(array $claims): Jwt {
     foreach ($claims as $key => $value) {
+      if (is_null($value)) continue;
+      if (is_array($value)) {
+        foreach ($value as $k => $v) {
+          $this->withClaim($key, $v);
+        }
+        continue;
+      }
       $this->withClaim($key, $value);
     }
     return $this;
@@ -289,6 +296,8 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
 
   public function withClaim(string $name, mixed $value): Jwt {
     $builder = $this->getBuilder();
+    if (is_null($value)) return $this;
+
     if ($set = $this->allows[$name] ?? null) {
       if (is_array($set)) {
         [$set, $formatter] = $set;
@@ -332,6 +341,7 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
       $this->withJwk($jwk);
       $signer = $this->jwk['alg'] ?? null;
       $key = $this->jwk['pem'] ?? null;
+      $this->withHeader('kid', $this->jwk['kid'] ?? null);
     }
     else if ($signer = $options['singer'] ?? null) {
       if (!is_array($signer)) [$signer, $key] = ['HS256', $signer];
@@ -498,8 +508,10 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     $kid = $jwk['kid'] ?? null;
     $pub = $jwk['pub'] ?? null;
     $pem = $jwk['pem'] ?? null;
-    if (!$alg && !$kid && !$pub && !$pem) 
+    if (!$alg && !$kid && !$pub && !$pem) {
       throw new JwtTokenException('Invalid JWK', JwtTokenException::INVALID_JWK);
+    }
+
     $this->jwk = [
       'alg' => $alg,
       'kid' => $kid,

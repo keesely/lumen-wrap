@@ -51,3 +51,76 @@ if (!function_exists('get_client_ip')) {
     return $showall ? $ips : current($ips);
   }
 }
+
+if (!function_exists('carbon')) {
+    /**
+     * Get a new Carbon instance for the current time.
+     *
+     * @param  \DateTimeInterface|string|null  $datetime
+     * @param  \DateTimeZone|string|null  $tz
+     *
+     * @throws \InvalidArgumentException
+     */
+  function carbon($datetime = null, $tz = null)
+  {
+    $tz = $tz ?: config('app.timezone');
+    return \Illuminate\Support\Carbon::parse($datetime)->tz($tz);
+  }
+}
+
+
+// jwt_encode($data, $options);
+if (!function_exists('jwt_encode')) {
+    function jwt_encode($data, $options = [])
+    {
+      if (
+        !($options['singer'] ?? null)
+        && !($options['jwk'] ?? null)
+      ) {
+        $options['singer'] = config('app.key');
+      }
+
+      return (new Lx\Support\JWT)->NewBuilder([
+        'claims' => $data,
+        ...$options
+      ])->toString();
+    }
+}
+
+// jwt_decode($token, $options);
+if (!function_exists('jwt_decode')) {
+  function jwt_decode($token, $options = [])
+  {
+    $toArray = false;
+    if (true === $options) ($toArray = true) && ($options = []);
+    $parse = (new Lx\Support\JWT)->Parse($token, $options);
+    return $toArray ? $parse->toArray() : $parse;
+  }
+}
+
+if (!function_exists('route')) {
+  /**
+   * Generate the URL to a named route.
+   *
+   * @param  array|string  $name
+   * @param  mixed  $parameters
+   * @param  bool  $absolute
+   * @return string
+   *
+   * @throws \InvalidArgumentException
+   */
+  function route($name, $parameters = [], $absolute = true)
+  {
+    return app('url')->route($name, $parameters, $absolute);
+  }
+}
+
+if (!function_exists('router')) {
+  /**
+   * Set Router addRoute
+   * */
+  function router() {
+    return app('router')->parse(...func_get_args());
+  }
+
+}

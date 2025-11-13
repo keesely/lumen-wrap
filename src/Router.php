@@ -244,6 +244,24 @@ class Router extends LumenRouter {
     return $this;
   }
 
+  public function parse() {
+    if(empty($args = func_get_args())) return $this;
+    $first = $args[0] ?? null;
+    if (is_string($first)) {
+      if (strpos($first, ':') === false && method_exists($this, $first)) {
+        return $this->$first(...array_slice($args, 1));
+      }
+      [$method, $uri] = array_slice(explode(':', array_shift($args)), 0, 2);
+      return $this->$method($uri, ...$args);
+    }
+    if (is_array($first) && count($args) == 1) {
+      foreach($first as $uri => $action) {
+        $this->parse($uri, $action);
+      }
+    }
+    return $this;
+  }
+
   public function addRoute ($method, $uri, $action) {
     $action = $this->parseAction($action);
 
