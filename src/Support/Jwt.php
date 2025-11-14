@@ -330,6 +330,14 @@ class Jwt implements Arrayable, ArrayAccess, Stringable
     $this->jwk = null;
 
     $this->setId(uniqid());
+    $this->setIssuedAt($this->formatTime($options['issued_at'] ?? time()));
+    if (isset($options['not_before'])) {
+      $this->setNotBefore($this->formatTime($options['not_before']));
+    }
+
+    if (isset($options['expires_in']) && ($exp = $options['expires_in']) > 0) {
+      $this->setExpiresAt($this->formatTime($exp < time() ? time() + $exp : $exp));
+    }
 
     $claims = $options['claims'] ?? [];
     if (count($claims) > 0) $this->withClaims($claims);
