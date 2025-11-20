@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2c140c64afda77cbc37e4567d5f63a98",
+    "content-hash": "5fd52e97b51eb09ee0195a6e48cc45b2",
     "packages": [
         {
             "name": "brick/math",
@@ -1597,6 +1597,59 @@
                 "source": "https://github.com/laravel/framework"
             },
             "time": "2025-03-24T11:54:20+00:00"
+        },
+        {
+            "name": "illuminate/cookie",
+            "version": "v11.46.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/illuminate/cookie.git",
+                "reference": "ae01d3fe9d6fc068630dd89218b02911e7bcbdf3"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/illuminate/cookie/zipball/ae01d3fe9d6fc068630dd89218b02911e7bcbdf3",
+                "reference": "ae01d3fe9d6fc068630dd89218b02911e7bcbdf3",
+                "shasum": ""
+            },
+            "require": {
+                "ext-hash": "*",
+                "illuminate/collections": "^11.0",
+                "illuminate/contracts": "^11.0",
+                "illuminate/macroable": "^11.0",
+                "illuminate/support": "^11.0",
+                "php": "^8.2",
+                "symfony/http-foundation": "^7.0.3",
+                "symfony/http-kernel": "^7.0.3"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "11.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Illuminate\\Cookie\\": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Taylor Otwell",
+                    "email": "taylor@laravel.com"
+                }
+            ],
+            "description": "The Illuminate Cookie package.",
+            "homepage": "https://laravel.com",
+            "support": {
+                "issues": "https://github.com/laravel/framework/issues",
+                "source": "https://github.com/laravel/framework"
+            },
+            "time": "2024-11-21T22:49:34+00:00"
         },
         {
             "name": "illuminate/database",
