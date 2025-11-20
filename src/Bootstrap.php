@@ -98,6 +98,7 @@ class Bootstrap extends Application {
    * ----------------------------------------------------
    * */
   public function withCookie() {
+    $this->configure('session');
     $this->app->register(\Illuminate\Cookie\CookieServiceProvider::class);
     $this->app->bind(\Illuminate\Contracts\Cookie\QueueingFactory::class, 'cookie');
     $this->app->middleware([
