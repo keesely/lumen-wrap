@@ -125,7 +125,6 @@ class Router extends LumenRouter {
 
   // 类型转换
   protected function paramType2RouterType($type) {
-
     switch ($type) {
     // 是否内置类型
     case 'int':
@@ -230,6 +229,20 @@ class Router extends LumenRouter {
       $controller = '\\'.$attributes['namespace'] . '\\' . $action;
     }
 
+    $methods = ($reflect = new \ReflectionClass($controller))->getMethods();
+    foreach ($methods as $method) {
+      if (!$attrs = $method->getAttributes(MixRoute::class)) continue;
+      foreach ($attrs as $attr) {
+        $attr = $attr->newInstance();
+        $this->addRoute(
+          $attr->method, 
+          $uri . $attr->uri, 
+          $controller . '@' . $method->getName()
+        );
+      }
+
+    }
+
     if (class_exists($controller) && method_exists($controller, 'getRoutes')) {
       $routes = $controller::getRoutes();
       if (is_array($routes)) {
@@ -306,7 +319,7 @@ class Router extends LumenRouter {
   }
 
   protected function _getRoutes () {
-    $domain = $this->server_host()[1];
+    $domain = $this->getDomainHost()[1];
     $routes = self::$_routes; // ?: $this->routes;
 
     foreach ($routes as $host => $router) {
@@ -324,7 +337,7 @@ class Router extends LumenRouter {
   public function domain ($domain, $action) {
     $std = new \FastRoute\RouteParser\Std($domain);
     $parse = $std->parse($domain);
-    $domain = $this->server_host()[1];
+    $domain = $this->getDomainHost()[1];
     
     $regxstr = '';
     $dataKeys = [];
@@ -356,7 +369,7 @@ class Router extends LumenRouter {
     }
   }
 
-  public function server_host () :array {
+  public function getDomainHost () :array {
     $s = $_SERVER;
     $host = Arr::get($s, 'HTTP_HOST', Arr::get($s, 'SERVER_NAME'));
     $port = Arr::get($s, 'SERVER_PORT', 80);
@@ -367,7 +380,7 @@ class Router extends LumenRouter {
   }
 
   public function getDomainParams () {
-    return Arr::get($this->domainStack, $this->server_host()[1], []);
+    return Arr::get($this->domainStack, $this->getDomainHost()[1], []);
   }
 
   public function getDomainParam ($name, $default = null) {
@@ -463,4 +476,9 @@ class Router extends LumenRouter {
     return $this;
   }
 
+}
+
+#[\Attribute(\Attribute::IS_REPEATABLE |\Attribute::TARGET_ALL)]
+class MixRoute {
+  public function __construct (public string $method, public string $uri) {}
 }
