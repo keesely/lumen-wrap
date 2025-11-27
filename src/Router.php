@@ -234,11 +234,17 @@ class Router extends LumenRouter {
       if (!$attrs = $method->getAttributes(MixRoute::class)) continue;
       foreach ($attrs as $attr) {
         $attr = $attr->newInstance();
-        $this->addRoute(
-          $attr->method, 
-          $uri . $attr->uri, 
-          $controller . '@' . $method->getName()
-        );
+        $action = $controller . '@' . $method->getName();
+        $http_method = $attr->method ?: 'get';
+        $http_method = 'any' == strtolower($http_method) ? static::HTTP_METHODS : [$http_method];
+        if ($options = $attr->options) $action = array_merge($options, ['uses' => $action]);
+        foreach ($http_method as $m) {
+          $this->addRoute(
+            $m, 
+            $uri . $attr->uri,
+            $action
+          );
+        }
       }
 
     }
@@ -480,5 +486,5 @@ class Router extends LumenRouter {
 
 #[\Attribute(\Attribute::IS_REPEATABLE |\Attribute::TARGET_ALL)]
 class MixRoute {
-  public function __construct (public string $method, public string $uri) {}
+  public function __construct (public string $method, public string $uri, public array $options = []) {}
 }
