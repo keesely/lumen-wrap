@@ -6,6 +6,7 @@ use Laravel\Lumen\Routing\Router as LumenRouter;
 use Laravel\Lumen\Routing\Controller as BaseController;
 use Laravel\SerializableClosure\SerializableClosure;
 use Illuminate\Support\Arr;
+use Lx\Routing\MixRoute;
 use Exception as RouterException;
 
 class Router extends LumenRouter {
@@ -238,11 +239,14 @@ class Router extends LumenRouter {
         $http_method = $attr->method ?: 'get';
         $http_method = 'any' == strtolower($http_method) ? static::HTTP_METHODS : [$http_method];
         if ($options = $attr->options) $action = array_merge($options, ['uses' => $action]);
+        if (strpos($attr->uri, '/') === false) $attr->uri = $uri . '/' . $attr->uri;
+
         foreach ($http_method as $m) {
           $this->addRoute(
             $m, 
-            $uri . $attr->uri,
-            $action
+            $attr->merge ? $uri . $attr->uri : $attr->uri,
+            $action,
+            $attr->merge
           );
         }
       }
@@ -281,12 +285,12 @@ class Router extends LumenRouter {
     return $this;
   }
 
-  public function addRoute ($method, $uri, $action) {
+  public function addRoute ($method, $uri, $action, $merge = true) {
     $action = $this->parseAction($action);
 
     $attributes = null;
 
-    if ($this->hasGroupStack()) {
+    if ($this->hasGroupStack() && $merge) {
       $attributes = $this->mergeWithLastGroup([]);
     }
 
@@ -482,9 +486,4 @@ class Router extends LumenRouter {
     return $this;
   }
 
-}
-
-#[\Attribute(\Attribute::IS_REPEATABLE |\Attribute::TARGET_ALL)]
-class MixRoute {
-  public function __construct (public string $method, public string $uri, public array $options = []) {}
 }

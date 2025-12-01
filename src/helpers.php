@@ -122,5 +122,10 @@ if (!function_exists('router')) {
   function router() {
     return app('router')->parse(...func_get_args());
   }
+}
 
+if (!function_exists('is_assoc_array')) {
+  function is_assoc_array($array) {
+    return array_keys($array) !== range(0, count($array) - 1);
+  }
 }
