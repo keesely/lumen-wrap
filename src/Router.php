@@ -426,12 +426,15 @@ class Router extends LumenRouter {
 
     $this->updateGroupStack($attributes);
 
-    if (is_callable($callback)) $callback($this);
+    if (is_callable($callback)) {
+      $routes = $callback($this);
+      if (is_array($routes)) $this->parse($routes);
+    }
 
     array_pop($this->groupStack);
   }
 
-  public function setting (array $attributes) {
+  public function loadRoutes (array $attributes) {
     $routes = $attributes['routes'] ?? null;
 
     $callback = fn($router) => abort(404, 'Not Found');

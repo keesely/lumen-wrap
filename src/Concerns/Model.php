@@ -23,16 +23,14 @@ trait Model {
   /**
    * Prepare a date for array / JSON serialization.
    *
-   * @Change autoset timezone from request header: x-timezone
-   *
    * @param  \DateTimeInterface  $date
    * @return string
    */
   protected function serializeDate(DateTimeInterface $date)
   {
     $tz = array_values(array_filter([
-      request()->header('x-timezone'),
       config('app.timezone'),
+      date_default_timezone_get(),
       'UTC',
     ]))[0];
     return $date->tz($tz)->format('c');
