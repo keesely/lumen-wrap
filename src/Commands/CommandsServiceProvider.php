@@ -18,7 +18,7 @@ class CommandsServiceProvider extends ServiceProvider {
       'ModelMake'      => 'command.model.make',
       'MigrateTables'  => 'command.migrate.tables',
       'RouteCache'     => 'command.route.cache',
-      //'VendorPublish'   => 'command.vendor.publish',
+      'VendorPublish'   => 'command.vendor.publish',
     ];
 
     /**
