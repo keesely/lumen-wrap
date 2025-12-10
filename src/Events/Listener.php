@@ -10,7 +10,8 @@ class Listener
 {
 
   public function __construct(
-    public $listener
+    public $listener,
+    public $method = null,
   ) {
     //
   }

@@ -67,9 +67,23 @@ class EventServiceProvider extends ServiceProvider
       if (count($attr) > 0) {
         $listeners = [];
         foreach ($attr as $a) {
-          $listener = $a->newInstance()->listener;
-          if ($listener && class_exists($listener)) {
-            $listeners[] = $a->newInstance()->listener;
+          $ins = $a->newInstance();
+          if ($listener = $ins->listener) {
+            if (
+              (is_string($listener) && class_exists($listener))
+              || is_callable($listener)
+            ) {
+              if ($ins->method && method_exists($listener, $ins->method)) {
+                if (is_callable([$listener, $ins->method])) {
+                  $listener = fn($event) => call_user_func([$listener, $ins->method], $event);
+                }
+                else {
+                  $listener = [$listener, $ins->method];
+                }
+              }
+              $listeners[] = $listener;
+
+            }
           }
         }
 
