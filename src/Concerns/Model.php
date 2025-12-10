@@ -75,6 +75,11 @@ trait Model {
       'saving'    => ['beforeSave', 'beforeSaving', 'fireSavingEvent'],
       'saved'     => ['afterSave' , 'afterSaved'  , 'fireSavedEvent'],
     ] as $ob => $observes) {
+      $observes = array_filter(
+        is_array($observes) ? $observes : [$observes],
+        fn ($ob) => is_callable($ob) || (is_string($ob) && method_exists(static::class, $ob))
+      );
+      if (!count($observes)) continue;
       static::$ob(fn($model) => $model->fireModelEvents($model, $observes));
     }
   }
