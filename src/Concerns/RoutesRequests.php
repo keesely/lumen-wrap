@@ -6,6 +6,7 @@ use Closure;
 use FastRoute\Dispatcher;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder as ModelBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Laravel\Lumen\Http\Request as LumenRequest;
 use Laravel\Lumen\Routing\Closure as RoutingClosure;
 use Laravel\Lumen\Routing\Controller as LumenController;
 use Laravel\Lumen\Routing\Pipeline;
-use Laravel\Lumen\Routing\RouteType;
+use Lx\Routing\RouteType;
 use Psr\Http\Message\ResponseInterface as PsrResponseInterface;
 use RuntimeException;
 use Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory;
@@ -449,6 +450,12 @@ trait RoutesRequests
 
         if ($response instanceof Responsable) {
             $response = $response->toResponse($request);
+        }
+        elseif ($response instanceof Closure) {
+            $response = $response($request);
+        }
+        elseif ($response instanceof ModelBuilder) {
+          $response = $response->simplePaginate();
         }
 
         if ($response instanceof PsrResponseInterface) {
