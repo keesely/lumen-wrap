@@ -94,7 +94,7 @@ trait ApiController
         $rules = $rules->getRules($rules->exists ? 'update' : 'create');
       }
       else {
-        $_rules = array_combine($rules->getFillable(), array_fill(0, count($rules->getFillable()), 'string|array|numeric'));
+        $_rules = array_combine($fill = $rules->getFillable(), array_fill(0, count($fill), 'nullable'));
         $_rules = array_merge($_rules, [
           $rules->getKeyName() => join('|', [
             'exists:' . $rules->getTable() . ',' . $rules->getKeyName(),
