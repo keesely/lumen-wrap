@@ -213,7 +213,7 @@ trait Searcher {
   public function scopeSearch($builder, $params) {
     $inputs = $params instanceof Collection ? $params : collect($params);
     $idents = ['_cols', '_fields', '_with', '_in', '_append', '_count', '_sort', '_where', '_has', '_hasmorph', '_belongs'];
-    $where = $inputs->only($this->getFields())->toArray();
+    $where = $inputs->only($this->getFillable())->toArray();
     $_wheres = $inputs->get('_where');
     $_has = $inputs->get('_has');
     $_hasmorph = $inputs->get('_hasmorph');
