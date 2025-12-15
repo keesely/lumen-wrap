@@ -103,7 +103,6 @@ trait ApiController
         $rules = $_rules;
       }
     }
-    dd($request->all(), $rules);
     return parent::validate($request, $rules, $messages, $customAttributes); 
   }
 
