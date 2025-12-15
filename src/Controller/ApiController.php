@@ -14,6 +14,7 @@ namespace Lx\Controller;
 
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Database\Eloquent\Model;
 
 trait ApiController
 {
@@ -31,8 +32,14 @@ trait ApiController
     return $this->responser;
   }
 
-  protected function withResponser($responser) {
-    $this->responser = $responser;
+  protected function withResponser($responser, $cover = true) {
+    if ($cover) $this->responser = $responser;
+    else if($this->responser instanceof \Closure) {
+      $this->responser = [$this->responser, $responser];
+    }
+    else if (is_array($this->responser)) {
+      $this->responser[] = $responser;
+    }
     return $this;
   }
 
@@ -78,6 +85,26 @@ trait ApiController
 
     if (count($args)) $this->failure(...$args);
     return $this->error(...array_slice(array_values($msg), 0, 2));
+  }
+
+  public function validate(Request|array $request, array|Model $rules, array $messages = [], array $customAttributes = []) {
+    if (is_array($request)) $request = app()->make(Request::class)->merge($request);
+    if ($rules instanceof Model) {
+      if (method_exists($rules, 'getRules')) {
+        $rules = $rules->getRules($rules->exists ? 'update' : 'create');
+      }
+      else {
+        $_rules = array_combine($rules->getFillable(), array_fill(0, count($rules->getFillable()), 'string|array|numeric'));
+        $_rules = array_merge($_rules, [
+          $rules->getKeyName() => join('|', [
+            'exists:' . $rules->getTable() . ',' . $rules->getKeyName(),
+          ])
+        ]);
+        $rules = $_rules;
+      }
+    }
+    dd($request->all(), $rules);
+    return parent::validate($request, $rules, $messages, $customAttributes); 
   }
 
 }
