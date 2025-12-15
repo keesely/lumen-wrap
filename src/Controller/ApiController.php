@@ -12,12 +12,37 @@
 
 namespace Lx\Controller;
 
+use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
+
 trait ApiController
 {
   protected $result = [];
 
+  protected $responser;
+
+  public function __construct() {
+    $this->withResponser(function ($response, Request $request) {
+      return (new ApiResponse($response, $request))($this);
+    });
+  }
+
+  public function getResponser() {
+    return $this->responser;
+  }
+
+  protected function withResponser($responser) {
+    $this->responser = $responser;
+    return $this;
+  }
+
   protected function setResult(array $data, $node) {
     if (!$data) return $this;
+    if (count($data) == 1) $data = array_shift($data);
+    else if (count($data) == 2 && is_string($data[0])) {
+      [$key, $data] = [array_shift($data), array_shift($data)];
+      $data = [$key => $data];
+    }
     $this->result = is_array($this->result) ? $this->result : [];
 
     $this->result[$node] = array_merge($this->result[$node] ?? [], $data);
@@ -32,6 +57,7 @@ trait ApiController
   }
 
   public function result($data, $msg = 'Success') {
+    $msg = str_contains($msg, '.') ? trans($msg) : $msg;
     $data = ['code' => 200, 'msg' => $msg, 'data' => $data];
 
     $this->result = is_array($this->result) ? $this->result : [];

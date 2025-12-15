@@ -6,7 +6,6 @@ use Closure;
 use FastRoute\Dispatcher;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder as ModelBuilder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -57,6 +56,12 @@ trait RoutesRequests
      * @var \FastRoute\Dispatcher
      */
     protected $dispatcher;
+
+    /**
+     * The Controller responser
+     * @var \Illuminate\Http\Response
+     * */
+    protected $responser;
 
     /**
      * Add new middleware to the application.
@@ -331,6 +336,10 @@ trait RoutesRequests
             throw new NotFoundHttpException;
         }
 
+        if (method_exists($instance, 'getResponser') && $responser = $instance->getResponser()) {
+          $this->responser = $responser;
+        }
+
         if ($instance instanceof LumenController) {
             return $this->callLumenController($instance, $method, $routeInfo);
         } else {
@@ -448,14 +457,15 @@ trait RoutesRequests
     {
         $request = app(Request::class);
 
+        if ($this->responser instanceof \Closure) {
+          $response = $this->forwardToResponser($response);
+        }
+
         if ($response instanceof Responsable) {
             $response = $response->toResponse($request);
         }
         elseif ($response instanceof Closure) {
             $response = $response($request);
-        }
-        elseif ($response instanceof ModelBuilder) {
-          $response = $response->simplePaginate();
         }
 
         if ($response instanceof PsrResponseInterface) {
@@ -467,6 +477,21 @@ trait RoutesRequests
         }
 
         return $response->prepare($request);
+    }
+
+    /**
+     * forwardToResponser
+     * 
+     * @param mixed $response
+     *
+     * @return mixed
+     * */
+    protected function forwardToResponser($response) {
+      if (is_callable($call = $this->responser)) {
+        return $call($response, $this->app->make('request'));
+      }
+
+      return $response;
     }
 
     /**
