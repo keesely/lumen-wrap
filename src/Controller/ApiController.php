@@ -59,7 +59,7 @@ trait ApiController
   }
 
   public function __call($name, $args) {
-    if (in_array($name, ['extend', 'info', 'debug', 'failure'])) {
+    if (in_array($name, ['extend', 'info', 'debug', 'failure', 'metadata'])) {
       $this->setResult($args, $name);
       //return $this->setResult(array_shift($args), $name);
     }
