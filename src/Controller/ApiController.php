@@ -94,15 +94,10 @@ trait ApiController
     if ($rules instanceof Model) {
       $table = $rules->getTable();
       $primary = $rules->getKeyName();
-      if (method_exists($rules, 'getRules')) {
-        $rules = $rules->getRules($rules->exists ? 'update' : 'create');
-        if (!$messages && method_exists($rules, 'getMessages')) $messages = $rules->getMessages();
-      }
+      if (!$messages && method_exists($rules, 'getMessages')) $messages = $rules->getMessages();
+      if (method_exists($rules, 'getRules')) $rules = $rules->getRules($rules->exists ? 'update' : 'create');
       else {
         $_rules = array_combine($fill = $rules->getFillable(), array_fill(0, count($fill), 'nullable'));
-        $_rules = array_merge($_rules, [
-          $primary => join('|', ['exists:' . $table . ',' . $primary])
-        ]);
         $rules = $_rules;
       }
       if (!$customAttributes) {

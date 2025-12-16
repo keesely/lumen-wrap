@@ -243,7 +243,7 @@ class Router extends LumenRouter {
 
         foreach ($http_method as $m) {
           $this->addRoute(
-            $m, 
+            strtoupper($m), 
             $attr->merge ? $uri . $attr->uri : $attr->uri,
             $action,
             $attr->merge
