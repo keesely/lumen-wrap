@@ -457,7 +457,7 @@ trait RoutesRequests
     {
         $request = app(Request::class);
 
-        if ($this->responser instanceof \Closure) {
+        if (($this->responser instanceof \Closure) || is_array($this->responser)) {
           $response = $this->forwardToResponser($response);
         }
 
@@ -487,10 +487,13 @@ trait RoutesRequests
      * @return mixed
      * */
     protected function forwardToResponser($response) {
-      if (is_callable($call = $this->responser)) {
-        return $call($response, $this->app->make('request'));
+      $resers = is_array($this->responser) ? $this->responser : [$this->responser];
+      $request = $this->app->make('request');
+      foreach ($resers as $res) {
+        if (is_callable($res)) {
+          $response = $res($response, $request);
+        } 
       }
-
       return $response;
     }
 

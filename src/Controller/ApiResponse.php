@@ -19,6 +19,7 @@ class ApiResponse {
 
   public function __invoke($controller) {
     $resp = $this->response;
+    if (empty($resp)) return response()->json(['msg' => 'Result is empty', 'code' => 0], 404);
     if ($resp instanceof ModelBuilder) {
       return $this->responseWithModelBuilder($resp, $controller);
     }

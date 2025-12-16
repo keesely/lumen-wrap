@@ -26,6 +26,8 @@ trait ApiController
     $this->withResponser(function ($response, Request $request) {
       return (new ApiResponse($response, $request))($this);
     });
+    // @Change With Controller Boot
+    if (method_exists($this, '__boot')) $this->__boot();
   }
 
   public function getResponser() {
@@ -90,17 +92,22 @@ trait ApiController
   public function validate(Request|array $request, array|Model $rules, array $messages = [], array $customAttributes = []) {
     if (is_array($request)) $request = app()->make(Request::class)->merge($request);
     if ($rules instanceof Model) {
+      $table = $rules->getTable();
+      $primary = $rules->getKeyName();
       if (method_exists($rules, 'getRules')) {
         $rules = $rules->getRules($rules->exists ? 'update' : 'create');
+        if (!$messages && method_exists($rules, 'getMessages')) $messages = $rules->getMessages();
       }
       else {
         $_rules = array_combine($fill = $rules->getFillable(), array_fill(0, count($fill), 'nullable'));
         $_rules = array_merge($_rules, [
-          $rules->getKeyName() => join('|', [
-            'exists:' . $rules->getTable() . ',' . $rules->getKeyName(),
-          ])
+          $primary => join('|', ['exists:' . $table . ',' . $primary])
         ]);
         $rules = $_rules;
+      }
+      if (!$customAttributes) {
+        $customAttributes = trans($key = 'app.fields.' . $table);
+        $customAttributes = $key == $customAttributes ? [] : $customAttributes;
       }
     }
     return parent::validate($request, $rules, $messages, $customAttributes); 
