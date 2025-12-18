@@ -63,6 +63,8 @@ trait Model {
   static function boot() {
     parent::boot();
 
+    if (method_exists(static::class, 'init')) static::init();
+
     // custom event monitor in model observes
     foreach ([
       'retrieved' => ['afterRetrieved', 'afterFetched'],
