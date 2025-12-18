@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder as ModelBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Illuminate\Http\Response;
+
 class ApiResponse {
 
   public function __construct(
@@ -38,6 +42,10 @@ class ApiResponse {
 
     if ($resp instanceof LengthAwarePaginator) {
       return $this->responseWithPages($resp, $controller);
+    }
+
+    if(!($resp instanceof Response) && !($resp instanceof SymfonyResponse) && !($resp instanceof BinaryFileResponse)) {
+      return $controller->result($resp);
     }
 
     return $resp;
