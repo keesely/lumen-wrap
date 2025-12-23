@@ -388,4 +388,22 @@ trait Searcher {
 
     return $builder->with($key);
   }
+
+  protected function firstRowFormatter(\Illuminate\Database\Eloquent\Model $model, $params) {
+    $inputs = $params instanceof Collection ? $params : collect($params);
+    $idents = ['_cols', '_fields', '_with', '_append', '_count', '_hidden'];
+    if ($hiddens = $inputs->get('_hidden')) $hiddens = $this->parseInValue($hiddens);
+    if ($cols = $inputs->get('_cols', $inputs->get('_fields'))) {
+      $cols = $this->parseInValue($cols);
+      $hiddens = array_merge($hiddens ?: [], 
+        array_values(array_diff(array_keys($model->getAttributes()), $cols ?: [])));
+    }
+    if ($hiddens = array_values(array_filter($hiddens?:[]))) $model->setHidden($hiddens);
+
+    if ($with = $inputs->get('_with')) $model->load($this->parseInValue($with));
+    if ($count = $inputs->get('_count')) $model->loadCount($this->parseInValue($count));
+    if ($append = $inputs->get('_append')) $model->append($this->parseInValue($append));
+
+    return $model;
+  }
 }

@@ -101,7 +101,7 @@ trait ApiController
         $rules = $_rules;
       }
       if (!$customAttributes) {
-        $customAttributes = trans($key = 'app.fields.' . $table);
+        $customAttributes = trans($key = 'validation.attributes.' . $table);
         $customAttributes = $key == $customAttributes ? [] : $customAttributes;
       }
     }
