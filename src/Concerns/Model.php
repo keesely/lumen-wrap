@@ -146,4 +146,9 @@ trait Model {
     ];
   }
 
+  public function __get($name) {
+    return parent::__get($name) 
+      ?: (isset($this->_extrattrs[$name]) ? $this->_extrattrs[$name] : null);
+  }
+
 }
