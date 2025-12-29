@@ -81,26 +81,13 @@ class ApiResponse {
   }
 
   public function responseWithModelBuilder(ModelBuilder $response, $controller) {
-    $req = $this->request;
-    $length = (int) array_values(array_filter([
-      $req->input('per_page'),
-      $req->input('limit'),
-      $req->input('length'),
-      15,
-    ]))[0];
-    $model = $response->paginate($length);
+    $model = $response->paginate();
     return $this->responseWithPages($model, $controller);
   }
 
   public function responseWithQuery(QueryBuilder $response, $controller) {
-    $req = $this->request;
-    $length = (int) array_values(array_filter([
-      $req->input('per_page'),
-      $req->input('limit'),
-      $req->input('length'),
-      15,
-    ]))[0];
-    $model = $response->paginate($length);
+    $model = $response->paginate();
+    //$model = $response->paginate($length[0] ?? null);
     return $this->responseWithPages($model, $controller);
   }
 
