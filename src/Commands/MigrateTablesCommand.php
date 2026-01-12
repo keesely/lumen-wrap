@@ -29,6 +29,7 @@ class MigrateTablesCommand extends Command {
   public function configure() {
     $this->addOption('in', 'i', InputOption::VALUE_OPTIONAL, '限定执行表名称,多表使用逗号分割, ex: table1,table2');
     $this->addOption('only', null, InputOption::VALUE_OPTIONAL, '限定执行方法：create/update');
+    $this->addOption('rollback', 'r', InputOption::VALUE_OPTIONAL, '执行批次回滚并删除生成的迁移文件');
   }
 
   protected function getOption($name) {
@@ -38,12 +39,18 @@ class MigrateTablesCommand extends Command {
   public function handle() {
     $tables = $this->getTablesFiles();
 
+    if ($rollback = $this->getOption('rollback')) {
+      return $this->rollback($rollback);
+    }
+
     if (($only = $this->getOption('only')) && !in_array($only, ['create', 'update'])) {
       $only = null;
     }
 
     $inTables = $this->getOption('in');
     if ($inTables) $inTables = array_values(array_filter(explode(',', $inTables)));
+
+    $batch = $this->getImportLastBatch() + 1;
 
     foreach ($tables as $table) {
       $tabStructs = require $table;
@@ -82,7 +89,8 @@ class MigrateTablesCommand extends Command {
 
         $istr = str_pad($i, 2, '0', STR_PAD_LEFT);
         $name = implode('_', [
-          date('Y_m_d_His'). $istr,
+          str_pad($batch, 2, '0', STR_PAD_LEFT),
+          date('YmdHis'). $istr,
           $hasTable ? 'update' : 'create',
           str_replace(' ', '_', $tab),
           $hash
@@ -95,7 +103,7 @@ class MigrateTablesCommand extends Command {
         $this->putStubContents($stub, $name);
         $this->info('make migration: '.$name . ' ('.$tab.') success.');
         $this->info('migrating table => database/migrations/'.$name. '.php');
-        $this->migrate($name);
+        $this->migrate($name, $batch);
         //$res = $this->call('migrate', ['--path' => 'database/migrations/'.$name.'.php']);
       }
     }
@@ -133,9 +141,26 @@ class MigrateTablesCommand extends Command {
       static::$migrations = DB::table('migrations')->pluck('migration');
 
     foreach (static::$migrations as $migration) {
-      if (str_contains($migration, $tab) && str_contains($migration, $hash)) return true;
+      if (str_contains($migration, $tab.'_'. $hash)) return true;
     }
     return false;
+  }
+
+  protected function getImportLastBatch() {
+    return DB::table('migrations')->selectRaw('MAX(batch) as last')->orderBy('batch', 'desc')
+      ->limit(1)->value('last') ?: 0;
+  }
+
+  protected function getImportedByBatch(int $batch) {
+    return DB::table('migrations')
+      ->where('batch', intval($batch))
+      ->pluck('migration');
+  }
+
+  protected function fixMigrateBatch($name, $batch) {
+    return DB::table('migrations')
+      ->where('migration', $name)
+      ->update(['batch' => $batch]);
   }
 
   protected function putStubContents($stub, $name): array {
@@ -147,12 +172,14 @@ class MigrateTablesCommand extends Command {
     return [true, $saveTo];
   }
 
-  protected function migrate($name) {
+  // 执行迁移数据 - throwable 删除失效文件
+  protected function migrate($name, int $batch) {
     $command = $this->getApplication()->find('migrate');
     $input = new ArrayInput(['--path' => $path = 'database/migrations/'.$name . '.php']);
     $output = new ConsoleOutput;
     try {
-        $command->run($input, $output);
+      $command->run($input, $output);
+      $this->fixMigrateBatch($name, $batch);
     } catch (\Throwable $e) {
       // 删除无效的迁移文件
       if (@unlink(base_path($path))) $this->info('removed migrate file: '. $path);
@@ -160,5 +187,22 @@ class MigrateTablesCommand extends Command {
     }
   }
 
+  // 回滚批次并删除
+  protected function rollback($batch) {
+    $command = $this->getApplication()->find('migrate:rollback');
+    $output = new ConsoleOutput;
+    try {
+      $migrations = $this->getImportedByBatch($batch);
+      foreach ($migrations as $name) {
+        $file = base_path($path = 'database/migrations/'.$name . '.php');
+        if (!file_exists($file)) continue;
+        $input = new ArrayInput(['--path' => $path]);
+        $command->run($input, $output);
+        @unlink($file);
+      }
+    } catch (\Throwable $e) {
+      throw $e;
+    }
+  }
 }
 
