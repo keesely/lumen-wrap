@@ -10,6 +10,10 @@ use Laravel\SerializableClosure\SerializableClosure;
 use Illuminate\Support\Facades\Schema;
 use Lx\Database\SchemaTable;
 
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\ConsoleOutput;
+
 class MigrateTablesCommand extends Command {
 
   protected $signature = 'migrate:tables
@@ -22,8 +26,25 @@ class MigrateTablesCommand extends Command {
 
   static $migrations = [];
 
+  public function configure() {
+    $this->addOption('in', 'i', InputOption::VALUE_OPTIONAL, '限定执行表名称,多表使用逗号分割, ex: table1,table2');
+    $this->addOption('only', null, InputOption::VALUE_OPTIONAL, '限定执行方法：create/update');
+  }
+
+  protected function getOption($name) {
+    return $this->options()[$name] ?? null;
+  }
+
   public function handle() {
     $tables = $this->getTablesFiles();
+
+    if (($only = $this->getOption('only')) && !in_array($only, ['create', 'update'])) {
+      $only = null;
+    }
+
+    $inTables = $this->getOption('in');
+    if ($inTables) $inTables = array_values(array_filter(explode(',', $inTables)));
+
     foreach ($tables as $table) {
       $tabStructs = require $table;
       if (!is_array($tabStructs)) {
@@ -37,6 +58,10 @@ class MigrateTablesCommand extends Command {
       foreach ($tabStructs as $tab => $struct) {
         $i++;
         if (!is_array($struct)) return $this->error('invalid table struct in ('.$table.')');
+        if ($inTables && !in_array($tab, $inTables)) {
+          $this->info('Table ['.$tab.'] Continue.');
+          continue;
+        }
 
         $code = serialize(new SerializableClosure(fn() => [$tab, $struct]));
         $code = base64_encode($code);
@@ -50,6 +75,10 @@ class MigrateTablesCommand extends Command {
         ]);
 
         $hasTable = Schema::hasTable($tab);
+        if (('update' == $only && !$hasTable) || ('create' == $only && $hasTable)) {
+          $this->info('Table ['.$tab.'] is ' . ($hasTable ? 'createed' : 'no created'));
+          continue;
+        }
 
         $istr = str_pad($i, 2, '0', STR_PAD_LEFT);
         $name = implode('_', [
@@ -58,14 +87,25 @@ class MigrateTablesCommand extends Command {
           str_replace(' ', '_', $tab),
           $hash
         ]);
+        // if (!file_exists(base_path($dir = 'database/migrations/'.$tab))) {
+        //     mkdir($dir, 0755, true);
+        // }
+        // $name = $tab .'/'. $name;
 
         $this->putStubContents($stub, $name);
         $this->info('make migration: '.$name . ' ('.$tab.') success.');
+        $this->info('migrating table => database/migrations/'.$name. '.php');
+        $this->migrate($name);
+        //$res = $this->call('migrate', ['--path' => 'database/migrations/'.$name.'.php']);
       }
     }
 
-    $this->info('migrating tables...');
-    $this->call('migrate');
+    // $this->info('migrating tables...');
+    // try {
+    //   $this->call('migrate');
+    // } catch(throwable $e) {
+    //     dd($e);
+    // }
   }
 
   protected function getTablesFiles() {
@@ -105,6 +145,19 @@ class MigrateTablesCommand extends Command {
     if (file_exists($saveTo)) return [false, 'migration file already exists ('.$saveTo.')'];
     file_put_contents($saveTo, $stub);
     return [true, $saveTo];
+  }
+
+  protected function migrate($name) {
+    $command = $this->getApplication()->find('migrate');
+    $input = new ArrayInput(['--path' => $path = 'database/migrations/'.$name . '.php']);
+    $output = new ConsoleOutput;
+    try {
+        $command->run($input, $output);
+    } catch (\Throwable $e) {
+      // 删除无效的迁移文件
+      if (@unlink(base_path($path))) $this->info('removed migrate file: '. $path);
+      throw $e;
+    }
   }
 
 }
