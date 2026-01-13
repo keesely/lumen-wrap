@@ -59,8 +59,9 @@ return new class extends Migration
      * */
     public function down(): void
     {
+      $drop = '{{ drop }}';
       $downHander = Arr::get($this->options, 'down', null);
       if (is_callable($downHander)) $downHander($this->table);
-      else Schema::dropIfExists($this->table);
+      elseif ($drop == 1) Schema::dropIfExists($this->table);
     }
 };

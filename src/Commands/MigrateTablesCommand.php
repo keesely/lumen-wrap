@@ -75,17 +75,18 @@ class MigrateTablesCommand extends Command {
         $hash = substr(md5($code), 0, 8);
         if ($this->hasImported($tab, $hash)) continue;
 
-        $stub = $this->getStubContents([
-          'code' => $code,
-          'table' => $tab,
-          'connection' => $struct['connection'] ?? config('database.default'),
-        ]);
-
         $hasTable = Schema::hasTable($tab);
         if (('update' == $only && !$hasTable) || ('create' == $only && $hasTable)) {
           $this->info('Table ['.$tab.'] is ' . ($hasTable ? 'createed' : 'no created'));
           continue;
         }
+
+        $stub = $this->getStubContents([
+          'code' => $code,
+          'table' => $tab,
+          'connection' => $struct['connection'] ?? config('database.default'),
+          'drop' => $hasTable ? 0 : 1,
+        ]);
 
         $istr = str_pad($i, 2, '0', STR_PAD_LEFT);
         $name = implode('_', [
