@@ -284,6 +284,50 @@ class Router extends LumenRouter {
     }
     return $this;
   }
+    
+  /**
+   * Merge the middleware group into the action.
+   *
+   * @param  array  $action
+   * @param  array  $middleware
+   * @return array
+   */
+  protected function mergeMiddlewareGroup(array $action, $middleware = null)
+  {
+    if (isset($middleware)) {
+      if (isset($action['middleware']) && ($aMiddleware = $action['middleware'])) {
+        $this->parseMiddleware($middleware);
+        $this->parseMiddleware($aMiddleware);
+        $merged = [];
+        foreach (array_merge($middleware, $aMiddleware) as $mid) {
+          $merged = array_merge($merged, $mid);
+        }
+        $middleware = [];
+        foreach ($merged as $name => $args) {
+          $middleware[] = implode(':', array_filter([$name, join(',', $args)]));
+        }
+        //$action['middleware'] = $middleware;
+        //$action['middleware'] = array_merge([], ...$middleware, ...$aMiddleware);
+      }
+      // else {
+      //   $action['middleware'] = $middleware;
+      // }
+      $action['middleware'] = $middleware;
+    }
+
+    return $action;
+  }
+
+  protected function parseMiddleware(array|string &$middlewares) {
+    $middlewares = is_array($middlewares) ? $middlewares : [$middlewares];
+    $parsed = [];
+    foreach ($middlewares as &$middleware) {
+      $middleware = explode(':', $middleware);
+      [$name, $args] = [$middleware[0]??null, array_slice($middleware, 1)];
+      $parsed[$name] = $args;
+    }
+    return $middleware = $parsed;
+  }
 
   public function addRoute ($method, $uri, $action, $merge = true) {
     $action = $this->parseAction($action);
