@@ -1,16 +1,16 @@
 <?php
 
-namespace Lx\Concerns;
-
+namespace Lx\Concerns\ModelTraits;
 use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+//use App\Support\HasJsonRelations;
 
 trait Searcher {
 
-  use HasJsonRelations;
+  //use HasJsonRelations;
 
   protected $whereBinds = [];
-  
+
   protected function indexOf($value) {
     $key = $this->indexOfKey ?: ($this->primaryKey ?: 'id');
     if (is_array($key)) return $this->where(function($query) use($key, $value) {
@@ -68,20 +68,24 @@ trait Searcher {
     list($key, $value) = explode(':', $cond, 2);
     $key = strtoupper($key);
     $func = static::$COND_MAPS[$key] ?? null;
-    if (!$func) $func = ['where', -1];
+    //if (!$func) $func = ['where', -1];
+    if (!$func) return $this->parseWhereCond('WHERE:'.$cond);
     list($func, $argslen) = $func;
     $argslen = $argslen > 0 ? $argslen : null;
 
-    $iscond = strpos($value, '&') !== false;
-    if ($iscond) $value = explode('&', $value);
+    $iscondAnd = strpos($value, 'AND') !== false;
+    $iscondOr = strpos($value, 'OR') !== false;
+    if ($iscondAnd) $value = explode('AND', $value);
+    elseif ($iscondOr) $value = explode('OR', $value);
     else $value = explode(',', $value, $argslen ?: null);
 
-    $value = array_map(function($v) {
-      $value = explode(',', $v);
-      return count($value) > 1 ? $value : $v;
+    $value = array_map(function($v) use($iscondOr) {
+      $cond = $iscondOr ? 'OR:' : '';
+      $value = array_map(function($v) use($cond) { return $cond . trim($v); }, explode(',', $v));
+      return count($value) > 1 ? $value : $cond . $v;
     }, $value);
 
-    $value = $this->parseWhereValue($value, $iscond, 'RAW' == $key);
+    $value = $this->parseWhereValue($value, $iscondAnd || $iscondOr, 'RAW' == $key);
     $value = count($value) > 1 ? $value : ($value[0] ?? null);
     return ['func' => $func, 'value' => $value];
   }
@@ -126,6 +130,17 @@ trait Searcher {
           });
         }
         else $builder->$func(...$value);
+      }
+      elseif (strpos($value, ':') !== false) {
+        $builder->$func(function($builder) use ($value) {
+          list($_key, $_value) = explode(':', $value, 2);
+          if (isset(static::$COND_MAPS[$_key])) {
+            $cond = $this->parseWhereCond($value);
+            $func = $cond['func'] ?? $func;
+            $value = $cond['value'] ?? $value;
+            $builder->$func($value);
+          }
+        });
       }
       else $builder->$func($value);
     }
@@ -213,7 +228,9 @@ trait Searcher {
   public function scopeSearch($builder, $params) {
     $inputs = $params instanceof Collection ? $params : collect($params);
     $idents = ['_cols', '_fields', '_with', '_in', '_append', '_count', '_sort', '_where', '_has', '_hasmorph', '_belongs'];
-    $where = $inputs->only($this->getFillable())->toArray();
+    $whereKeys = $this->getFields();
+    if (is_array($this->searchable)) $whereKeys = array_merge($whereKeys, $this->searchable ?: []);
+    $where = $inputs->only($whereKeys)->toArray();
     $_wheres = $inputs->get('_where');
     $_has = $inputs->get('_has');
     $_hasmorph = $inputs->get('_hasmorph');
@@ -362,19 +379,9 @@ trait Searcher {
 
   // 注入自定义查询方法
   public function scopeLast($builder, ...$cols) {
-    $builder->orderBy($this->getPrimaryKey(), 'desc');
+    $builder->orderBy('id', 'desc');
     if (count($cols)) $builder->select(...$cols);
-	}
-
-	public function scopeDesc($builder, string | null $field = null) {
-		if(is_null($field)) $field = $this->getPrimaryKey();
-		$builder->orderBy($field, 'DESC');
-	}
-
-	public function scopeAsc($builder, string | null $field = null) {
-		if(is_null($field)) $field = $this->getPrimaryKey();
-		$builder->orderBy($field, 'ASC');
-	}
+  }
 
   public function scopeBelongs($builder, $key, array $relations = [], array $cols = []) {
     @list($related, $foreign, $owner, $relation) = array_pad($relations, 4, null);
@@ -397,23 +404,5 @@ trait Searcher {
     );
 
     return $builder->with($key);
-  }
-
-  protected function firstRowFormatter(\Illuminate\Database\Eloquent\Model $model, $params) {
-    $inputs = $params instanceof Collection ? $params : collect($params);
-    $idents = ['_cols', '_fields', '_with', '_append', '_count', '_hidden'];
-    if ($hiddens = $inputs->get('_hidden')) $hiddens = $this->parseInValue($hiddens);
-    if ($cols = $inputs->get('_cols', $inputs->get('_fields'))) {
-      $cols = $this->parseInValue($cols);
-      $hiddens = array_merge($hiddens ?: [], 
-        array_values(array_diff(array_keys($model->getAttributes()), $cols ?: [])));
-    }
-    if ($hiddens = array_values(array_filter($hiddens?:[]))) $model->setHidden($hiddens);
-
-    if ($with = $inputs->get('_with')) $model->load($this->parseInValue($with));
-    if ($count = $inputs->get('_count')) $model->loadCount($this->parseInValue($count));
-    if ($append = $inputs->get('_append')) $model->append($this->parseInValue($append));
-
-    return $model;
   }
 }

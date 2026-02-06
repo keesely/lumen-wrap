@@ -303,7 +303,8 @@ class Router extends LumenRouter {
           $merged = array_merge($merged, $mid);
         }
         $middleware = [];
-        foreach ($merged as $name => $args) {
+				foreach ($merged as $name => $args) {
+					$args = is_array($args) ? $args : [$args];
           $middleware[] = implode(':', array_filter([$name, join(',', $args)]));
         }
         //$action['middleware'] = $middleware;

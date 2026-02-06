@@ -18,7 +18,7 @@ trait Model {
    * @define ignore fields in fillable extra attributes
    * @var array
    * */
-  protected $_extrattrs = [];
+	protected $_extrattrs = [];
 
   /**
    * Prepare a date for array / JSON serialization.
@@ -26,15 +26,12 @@ trait Model {
    * @param  \DateTimeInterface  $date
    * @return string
    */
-  protected function serializeDate(DateTimeInterface $date)
-  {
-    $tz = array_values(array_filter([
-      config('app.timezone'),
-      date_default_timezone_get(),
-      'UTC',
-    ]))[0];
-    return $date->tz($tz)->format('c');
-  }
+	 protected function serializeDate(DateTimeInterface $date)
+	 {
+		 //$date = parent::serializeDate($date);
+		 $tz = config('app.timezone', date_default_timezone_get() ?: 'UTC');
+		 return $date->tz($tz)->format('c');
+	 }
 
   /**
    * Get the database connection instance.
@@ -67,7 +64,7 @@ trait Model {
 
     // custom event monitor in model observes
     foreach ([
-      'retrieved' => ['afterRetrieved', 'afterFetched'],
+      'retrieved' => ['afterRetrieved', 'afterFetched', 'rowFormatter'],
       'creating'  => ['beforeCreate'  , 'beforeCreating'],
       'updating'  => ['beforeUpdate'  , 'beforeUpdating'],
       'deleting'  => ['beforeDelete'  , 'beforeDeleting'],

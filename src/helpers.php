@@ -129,3 +129,31 @@ if (!function_exists('is_assoc_array')) {
     return array_keys($array) !== range(0, count($array) - 1);
   }
 }
+
+if (!function_exists('array2csv')) {
+  function array2csv(array $rows, array $heads, string | null $download = null) {
+    ob_start();
+    $fp = fopen('php://output', 'w');
+    fputcsv($fp, $heads);
+
+    foreach ($rows as $row) {
+      fputcsv($fp, $row);
+    }
+    fclose($fp);
+    $contnets = ob_get_contents();
+    ob_end_clean();
+
+    // with UTF-8 BOM
+    $contents = "\xEF\xBB\xBF" . $contnets;
+    if ($download) {
+      header('Content-Type: text/csv; charset=utf-8');
+      header('Content-Disposition: attachment; filename="' . $download . '.csv"');
+      header('Content-Length: ' . strlen($contnets));
+      header('Connection: close');
+      header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+      header('Expires: 0');
+      header('Pragma: no-cache');
+    }
+    echo $contents;
+  }
+}
