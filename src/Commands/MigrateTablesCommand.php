@@ -73,7 +73,14 @@ class MigrateTablesCommand extends Command {
         $code = serialize(new SerializableClosure(fn() => [$tab, $struct]));
         $code = base64_encode($code);
         $hash = substr(md5($code), 0, 8);
-        if ($this->hasImported($tab, $hash)) continue;
+				if ($this->hasImported($tab, $hash)) continue;
+
+				// @change 检查数据库为 sqlite 的情况是否自动 tocuh sqlite file
+				$connection = $struct['connection'] ?? config('database.default');
+				$driver = config('database.connections.'. $connection, []);
+				if (('sqlite' == ($driver['driver'])) && ($driver['auto_touch'] ?? false)) {
+					$this->autoTouchSqliteFile($driver);
+				}
 
         $hasTable = Schema::hasTable($tab);
         if (('update' == $only && !$hasTable) || ('create' == $only && $hasTable)) {
@@ -84,9 +91,9 @@ class MigrateTablesCommand extends Command {
         $stub = $this->getStubContents([
           'code' => $code,
           'table' => $tab,
-          'connection' => $struct['connection'] ?? config('database.default'),
+          'connection' => $connection,
           'drop' => $hasTable ? 0 : 1,
-        ]);
+				]);
 
         $istr = str_pad($i, 2, '0', STR_PAD_LEFT);
         $name = implode('_', [
@@ -204,6 +211,20 @@ class MigrateTablesCommand extends Command {
     } catch (\Throwable $e) {
       throw $e;
     }
-  }
+	}
+
+	// 根据配置指令自动 touch sqlite 文件
+	protected function autoTouchSqliteFile(array $config) {
+		$driver = $config['driver'] ?? null;
+		$autoTouch = $config['auto_touch'] ?? false;
+		if ('sqlite' != $driver || !$autoTouch) return;
+		if (!$dbpath = $config['database'] ?? null) return;
+
+		$dir = dirname($dbpath);
+
+		if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+		if (!file_exists($dbpath)) touch($dbpath);
+	}
 }
 
