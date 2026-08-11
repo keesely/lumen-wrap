@@ -297,22 +297,22 @@ class Router extends LumenRouter {
     if (isset($middleware)) {
       if (isset($action['middleware']) && ($aMiddleware = $action['middleware'])) {
         $this->parseMiddleware($middleware);
-        $this->parseMiddleware($aMiddleware);
+				$this->parseMiddleware($aMiddleware);
+				// @fix K-122 修复 lumen-wrap Router mergeMiddlewareGroup 中间件合并 bug
         $merged = [];
         foreach (array_merge($middleware, $aMiddleware) as $mid) {
           $merged = array_merge($merged, $mid);
-        }
+				}
         $middleware = [];
 				foreach ($merged as $name => $args) {
+					if (intval($name) == $name && is_string($args)) {
+						$name = $args;
+						$args = [];
+					}
 					$args = is_array($args) ? $args : [$args];
           $middleware[] = implode(':', array_filter([$name, join(',', $args)]));
-        }
-        //$action['middleware'] = $middleware;
-        //$action['middleware'] = array_merge([], ...$middleware, ...$aMiddleware);
+				}
       }
-      // else {
-      //   $action['middleware'] = $middleware;
-      // }
       $action['middleware'] = $middleware;
     }
 
